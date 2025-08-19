@@ -1,0 +1,7 @@
+{
+  "content-packages:ARTIFACTS|required": [
+    {
+        "id":"com.aem.ai.scanner/all/1.0-SNAPSHOT/zip"
+    }
+  ]
+}
