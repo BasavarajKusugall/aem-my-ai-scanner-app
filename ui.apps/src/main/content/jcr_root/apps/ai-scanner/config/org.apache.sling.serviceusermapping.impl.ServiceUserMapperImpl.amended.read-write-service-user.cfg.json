@@ -1,0 +1,6 @@
+{
+  "service.ranking:Integer":0,
+  "user.mapping":[
+    "aem-stck-scanner:read-write-service-user=read-write-service-user"
+  ]
+}

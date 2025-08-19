@@ -1,0 +1,41 @@
+{
+    "variables": {
+        "sling.home": null
+    },
+    "bundles": [
+      {
+        "id": "org.apache.jackrabbit:oak-segment-tar:${oak.version}",
+        "start-order": "15"
+      }
+    ],
+    "configurations": {
+        "org.apache.jackrabbit.oak.segment.SegmentNodeStoreService": {
+            "name": "Default NodeStore"
+        },
+        "org.apache.jackrabbit.oak.segment.SegmentNodeStoreService~global": {
+            "name": "Default NodeStore",
+            "repository.home": "${sling.home}/composite/repository-libs"
+        },
+        "org.apache.jackrabbit.oak.composite.CrossMountReferenceValidatorProvider": {
+            "failOnDetection": true
+        },
+        "org.apache.jackrabbit.oak.composite.MountInfoProviderService": {
+            "mountName": "libs",
+            "readOnlyMount": false,
+            "pathsSupportingFragments": [],
+            "mountedPaths": [
+                "/apps",
+                "/libs",
+                "/static"
+            ]
+        },
+        "org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener": {
+            "includedTargets": [
+                "^\/apps\/.*$",
+                "^\/libs\/.*$",
+                "^\/oak:index\/.*$",
+                "^\/static\/.*$"
+            ]
+        }
+    }
+}

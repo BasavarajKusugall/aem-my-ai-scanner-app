@@ -24,13 +24,14 @@
 
     <artifactId>launcher</artifactId>
 
-    <name>aem-my-ai-scanner-app - Launcher</name>
+    <name>My AEM AI Scanner App Project - Launcher</name>
     <description>
         This is a Module which contains a sample feature model build, built on
         top of the Sling Starter and adding this project's artifacts.
     </description>
     <build>
         <plugins>
+
             <plugin>
                 <groupId>org.apache.sling</groupId>
                 <artifactId>slingfeature-maven-plugin</artifactId>
@@ -92,7 +93,7 @@
                         <phase>prepare-package</phase>
                         <goals>
                             <goal>aggregate-features</goal>
-                            <goal>analyse-features</goal>
+                           <!-- <goal>analyse-features</goal>-->
                             <goal>attach-features</goal>
                         </goals>
                     </execution>
@@ -104,29 +105,32 @@
                     <execution>
                         <id>prepare-feature-launcher</id>
                         <goals>
-                            <goal>unpack</goal>
+                            <goal>get</goal>
+                            <goal>copy</goal>
                         </goals>
                         <phase>package</phase>
                         <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>org.apache.sling</groupId>
-                                    <artifactId>org.apache.sling.feature.launcher</artifactId>
-                                    <version>${org.apache.sling.feature.launcher.version}</version>
-                                    <type>tar.gz</type>
-                                    <!-- remove the version number from the unpacked folder -->
-                                    <fileMappers>
-                                        <org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
-                                            <pattern>\Qorg.apache.sling.feature.launcher-${org.apache.sling.feature.launcher.version}\E</pattern>
-                                            <replacement>org.apache.sling.feature.launcher</replacement>
-                                        </org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
-                                    </fileMappers>
-                                </artifactItem>
-                            </artifactItems>
+                            <artifact>org.apache.sling:org.apache.sling.feature.launcher:${org.apache.sling.feature.launcher.version}</artifact>
+                            <stripVersion>true</stripVersion>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
     </build>
+    <dependencies>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.15.0</version> <!-- use latest stable -->
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sling</groupId>
+            <artifactId>org.apache.sling.commons.osgi</artifactId>
+            <version>2.4.0</version> <!-- stable -->
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
 </project>

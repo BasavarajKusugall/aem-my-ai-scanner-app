@@ -31,7 +31,7 @@
     <artifactId>core.example</artifactId>
     <packaging>bundle</packaging>
 
-    <name>aem-my-ai-scanner-app - Core Example</name>
+    <name>My AEM AI Scanner App Project - Core Example</name>
     <description>
         This is the Example Module for the Sample Core module (core).
         The basic idea is to have a clean 'core' module in which you
@@ -59,7 +59,7 @@
                 <configuration>
                     <instructions>
                         <Embed-Dependency>*;scope=compile;inline=true</Embed-Dependency>
-                        <Sling-Model-Packages>com.aem.ai.scanner.com.aem.ai.scanner.model</Sling-Model-Packages>
+                        <Sling-Model-Packages>com.aem.ai.scanner.models</Sling-Model-Packages>
                         <_dsannotations>*</_dsannotations>
                         <_metatypeannotations>*</_metatypeannotations>
                         <_removeheaders>
@@ -80,7 +80,7 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.sling</groupId>
-                <artifactId>sling-maven-plugin</artifactId>
+                <artifactId>maven-sling-plugin</artifactId>
                 <configuration>
                     <slingUrl>http://${sling.host}:${sling.port}/system/console</slingUrl>
                     <user>${sling.user}</user>

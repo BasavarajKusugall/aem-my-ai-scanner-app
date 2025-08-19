@@ -1,0 +1,79 @@
+{
+    "variables": {
+        "sling.home": null
+    },
+    "bundles": [
+      {
+        "id": "org.apache.jackrabbit:oak-segment-tar:${oak.version}",
+        "start-order": "15"
+      }
+    ],
+    "configurations": {
+        "org.apache.jackrabbit.oak.segment.SegmentNodeStoreService": {
+            "name": "Default NodeStore",
+            "standby": true,
+            "customBlobStore": true
+        },
+        "org.apache.jackrabbit.oak.composite.CompositeNodeStoreService": {
+            "seedMount": "libs",
+            "enabled": true,
+            "enableChecks": false,
+            "partialReadOnly": true
+        },
+        "org.apache.jackrabbit.oak.composite.CrossMountReferenceValidatorProvider": {
+            "failOnDetection": true
+        },
+        "org.apache.jackrabbit.oak.composite.MountInfoProviderService": {
+            "mountName": "libs",
+            "readOnlyMount": true,
+            "pathsSupportingFragments": [
+                "/oak:index/.*$"
+            ],
+            "mountedPaths": [
+                "/apps",
+                "/libs",
+                "/static",
+                "/jcr:system/rep:permissionStore/oak:mount-libs-default"
+            ]
+        },
+        "org.apache.jackrabbit.oak.composite.checks.NodeTypeMountedNodeStoreChecker~referenceable": {
+            "errorLabel": "referenceable node",
+            "invalidNodeType": "mix:referenceable",
+            "excludedNodeTypes": [
+                "nt:resource"
+            ]
+        },
+        "org.apache.jackrabbit.oak.composite.checks.NodeTypeMountedNodeStoreChecker~versionable": {
+            "errorLabel": "versionable node",
+            "invalidNodeType": "mix:versionable"
+        },
+        "org.apache.jackrabbit.oak.plugins.blob.datastore.FileDataStore": {
+            "minRecordLength": 4096,
+            "path": "${sling.home}/repository/datastore",
+            "cacheSizeInMB": 128
+        },
+        "org.apache.jackrabbit.oak.segment.SegmentNodeStoreFactory~libs": {
+            "role": "composite-mount-libs",
+            "customBlobStore": false,
+            "nodeDeduplicationCache.size": 0,
+            "repository.home": "${sling.home}/composite/repository-libs"
+        },
+        "org.apache.jackrabbit.oak.segment.SegmentNodeStoreFactory~global": {
+            "service.ranking": 100,
+            "role": "composite-global",
+            "registerDescriptors": true,
+            "dispatchChanges": true,
+            "repository.home": "${sling.home}/composite/repository-global"
+        },
+        "org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener": {
+            "includedTargets": [
+                "^\/.*$"
+            ],
+            "excludedTargets": [
+                "^\/apps\/.*$",
+                "^\/libs\/.*$",
+                "^\/static\/.*$"
+            ]
+        }
+    }
+}

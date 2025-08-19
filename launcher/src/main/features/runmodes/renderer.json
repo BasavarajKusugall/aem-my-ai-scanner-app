@@ -1,0 +1,24 @@
+{
+    "configurations": {
+        "org.apache.sling.cms.core.publication.PublicationManagerFactoryImpl": {
+            "instanceType": "RENDERER",
+            "publicationMode": "CONTENT_DISTRIBUTION",
+            "agents": []
+        },
+        "org.apache.sling.cms.core.publication.PublicationPropertyProvider": {
+            "endpointPath": "libs/sling/distribution/services/importer/default"
+        },
+        "org.apache.sling.distribution.packaging.impl.importer.LocalDistributionPackageImporterFactory~default": {
+            "packageBuilder.target": "(name=default)",
+            "name": "default"
+        },
+        "org.apache.sling.distribution.serialization.impl.vlt.VaultDistributionPackageBuilderFactory~default": {
+            "aclHandling": "IGNORE",
+            "cugHandling": "OVERWRITE",
+            "importMode": "REPLACE",
+            "name": "default",
+            "package.filters": ["/home/users|-.*/.tokens", "/home/users|-.*/rep:cache"],
+            "type": "jcrvlt"
+        }
+    }
+}

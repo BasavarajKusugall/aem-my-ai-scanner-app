@@ -31,7 +31,7 @@
     <artifactId>ui.apps</artifactId>
     <packaging>content-package</packaging>
 
-    <name>aem-my-ai-scanner-app - UI Apps</name>
+    <name>My AEM AI Scanner App Project - UI Apps</name>
     <description>
         This is an empty JCR Package where the JCR Content
         can be deployed with.
@@ -62,28 +62,4 @@
             </plugin>
         </plugins>
     </build>
-    <!-- @startForNotAll@ This is used for the Post Generation Handling. Do not alter or remove -->
-    <profiles>
-        <!-- ATTENTION: It is highly recomended not to deploy this with this Profile if this Package was or will be deployed with the All package -->
-        <profile>
-            <id>autoInstallPackage</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>io.wcm.maven.plugins</groupId>
-                        <artifactId>wcmio-content-package-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>install-package</id>
-                                <goals>
-                                    <goal>install</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-    <!-- @endForNotAll@ This is used for the Post Generation Handling. Do not alter or remove -->
 </project>

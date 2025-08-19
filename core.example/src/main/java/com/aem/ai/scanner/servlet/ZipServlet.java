@@ -17,6 +17,7 @@
 package com.aem.ai.scanner.servlet;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
@@ -31,11 +32,13 @@ import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Download servlet
  * 
- * <p>This servlet binds all resources of the type <tt>aem-my-ai-scanner-app/home</tt>
+ * <p>This servlet binds all resources of the type <tt>ai-scanner/home</tt>
  * and the zip extension. It generates a simplistic zip archive of all the child
  * pages, based on the <tt>jcr:title</tt> and <tt>jcr:content</tt> properties.</p>
  * 
@@ -49,7 +52,7 @@ import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
     property = {
         Constants.SERVICE_DESCRIPTION + "=Hello World Path Servlet",
         Constants.SERVICE_VENDOR + "=The Apache Software Foundation",
-        "sling.servlet.resourceTypes=aem-my-ai-scanner-app/home",
+        "sling.servlet.resourceTypes=ai-scanner/home",
         "sling.servlet.extensions=zip",
     }
 )

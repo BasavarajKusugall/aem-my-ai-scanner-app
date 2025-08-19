@@ -31,8 +31,8 @@
     <artifactId>all</artifactId>
     <packaging>content-package</packaging>
 
-    <name>aem-my-ai-scanner-app - All</name>
-    <description>com.aem.ai.scanner - aem-my-ai-scanner-app: All-in-one deployment content package</description>
+    <name>My AEM AI Scanner App Project - All</name>
+    <description>com.aem.ai.scanner - My AEM AI Scanner App Project: All-in-one deployment content package</description>
 
     <properties>
         <maven.test.skip>true</maven.test.skip>
@@ -59,7 +59,7 @@
                 <artifactId>filevault-package-maven-plugin</artifactId>
                 <configuration>
                     <packageType>container</packageType>
-                    <embeddedTarget>/apps/aem-my-ai-scanner-app-all/install</embeddedTarget>
+                    <embeddedTarget>/apps/ai-scanner/install</embeddedTarget>
                     <embeddeds>
                         <embedded>
                             <groupId>${project.groupId}</groupId>

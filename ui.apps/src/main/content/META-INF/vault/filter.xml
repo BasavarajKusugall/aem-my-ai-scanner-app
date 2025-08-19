@@ -14,7 +14,7 @@
 <workspaceFilter version="1.0">
     <!--
         Any node that will contain customer data needs to be excluded
-        otherwise a Package Installation will wipe them.
+        otherwise a Pacakge Installation will wipe them.
 
         If there is a mix then all provided nodes must be included and
         all custom nodes excluded.
@@ -22,17 +22,18 @@
         If unsure what to do then go to the Composum Package Manager
         (/bin/packages.html) and create a test package. To to the package
         filter list and add filter entries until all of the app provides
-        nodes are included but none of the customer generated nodes.
+        nodes are included but none of the customer generatedd nodes.
 
-        Also any sub package of this module needs to exclude /apps/aem-my-ai-scanner-app/install
+        Also any sub pckage of this module needs to exclude /apps/ai-scanner/install
         folder otherwise they wipe all installed bundles.
     -->
-    <filter root="/content/aem-my-ai-scanner-app"/>
+    <filter root="/content/ai-scanner"/>
     <!--
         Need to exclude the Install folder otherwise the Bundle will be undeployed
-        as it is in the '/apps/aem-my-ai-scanner-app/install' folder (see the 'all'
+        as it is in the '/apps/ai-scanner/install' folder (see the 'all'
         package).
     -->
-    <filter root="/apps/aem-my-ai-scanner-app"/>
-
+    <filter root="/apps/ai-scanner">
+        <exclude pattern="/apps/ai-scanner/install/.*"/>
+    </filter>
 </workspaceFilter>

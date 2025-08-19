@@ -1,7 +1,13 @@
 {
+  "bundles": [
+    {
+        "id": "com.aem.ai.scanner/core/1.0-SNAPSHOT",
+        "start-order": 20
+    }
+  ],
   "content-packages:ARTIFACTS|required": [
     {
-        "id":"com.aem.ai.scanner/all/1.0-SNAPSHOT/zip"
+        "id":"com.aem.ai.scanner/ui.apps/1.0-SNAPSHOT/zip"
     }
   ]
 }
