@@ -34,4 +34,7 @@ public interface TradeDAO {
     // Telegram configs
     List<TelegramConfig> fetchTelegramConfigs();
     List<TelegramConfig> fetchTelegramMonitorConfigs();
+    List<TelegramConfig> fetchTelegramDailyNewsConfigs();
+    List<TelegramConfig> fetchTelegramDailyAlertsConfigs();
+    List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs();
 }

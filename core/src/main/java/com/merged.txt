@@ -1,0 +1,1748 @@
+===== pm/config/KiteConfig.java =====
+package com.pm.config;
+
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+
+@ObjectClassDefinition(name="Zerodha (Kite) Connector Config")
+public @interface KiteConfig {
+    @AttributeDefinition(name="API Key") String apiKey();
+    @AttributeDefinition(name="API Secret") String apiSecret();
+    @AttributeDefinition(name="Base URL") String baseUrl() default "https://api.kite.trade";
+    @AttributeDefinition(name="Login URL") String loginUrl() default "https://kite.zerodha.com/connect/login?v=3&api_key=";
+    @AttributeDefinition(name="Rate Limit QPS") int qps() default 3;
+}
+
+===== pm/config/PortfolioSyncConfig.java =====
+package com.pm.config;
+
+
+import org.osgi.service.metatype.annotations.*;
+
+@ObjectClassDefinition(name = "Portfolio Sync Scheduler")
+public @interface PortfolioSyncConfig {
+    @AttributeDefinition(name = "Enabled") boolean enabled() default true;
+    @AttributeDefinition(name = "Cron (Quartz)") String cron() default "0 0/5 * * * ?"; // every 5 min
+    @AttributeDefinition(name = "Max Parallel Accounts") int parallelism() default 4;
+    @AttributeDefinition(name = "HTTP Timeout ms") int httpTimeoutMs() default 15000;
+    @AttributeDefinition(name = "Max Retries") int maxRetries() default 3;
+    @AttributeDefinition(name = "Initial Backoff ms") int backoffMs() default 500;
+}
+===== pm/config/UpstoxConfig.java =====
+package com.pm.config;
+
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+
+@ObjectClassDefinition(name="Upstox Connector Config")
+public @interface UpstoxConfig {
+    @AttributeDefinition(name="Client ID") String clientId();
+    @AttributeDefinition(name="Client Secret") String clientSecret();
+    @AttributeDefinition(name="Base URL") String baseUrl() default "https://api.upstox.com/v2";
+    @AttributeDefinition(name="Rate Limit QPS") int qps() default 3;
+}
+===== pm/connectors/BrokerConnector.java =====
+package com.pm.connectors;
+
+
+import com.pm.dto.*;
+import java.util.List;
+
+public interface BrokerConnector {
+    String brokerCode(); // "ZERODHA", "UPSTOX", etc.
+
+    /** Fetch all accounts that have valid access (token, creds) for this broker. */
+    List<BrokerAccountRef> discoverAccounts();
+
+    /** Pull full portfolio snapshot for given broker account (holdings, positions, cash). */
+    PortfolioSnapshot fetchPortfolio(BrokerAccountRef account) throws BrokerException;
+
+    /** (Future) place/cancel orders, etc. Expose via same connector. */
+    // String placeOrder(...); void cancelOrder(...); etc.
+}
+===== pm/connectors/kite/KiteAuthService.java =====
+package com.pm.connectors.kite;
+
+public interface KiteAuthService {
+    /**
+     * Exchanges the request_token for an access_token and stores in DB
+     *
+     * @param requestToken the request_token returned by Kite Connect login
+     * @return true if success, false otherwise
+     */
+    String getAccessTokenAndStoreToken(String requestToken, String brokerName, String accountNumber, String apiKey, String apiSecret) ;
+}
+===== pm/connectors/kite/KiteConnector.java =====
+package com.pm.connectors.kite;
+
+import com.fasterxml.jackson.databind.*;
+import com.pm.config.KiteConfig;
+import com.pm.connectors.BrokerConnector;
+import com.pm.dto.*;
+import com.pm.net.HttpClientService;
+import com.pm.services.AccountRegistryService;
+import org.apache.commons.lang3.StringUtils;
+import org.osgi.service.component.annotations.*;
+
+import java.net.http.HttpResponse;
+import java.time.Instant;
+import java.util.*;
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.osgi.service.component.annotations.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Component(service = BrokerConnector.class, immediate = true)
+public class KiteConnector implements BrokerConnector {
+
+    private static final Logger log = LoggerFactory.getLogger(KiteConnector.class);
+
+    // ANSI color codes
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String RED = "\u001B[31m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String RESET = "\u001B[0m";
+
+    @Reference
+    private HttpClientService http;
+    @Reference
+    private AccountRegistryService registry;
+
+    @Reference
+    private KiteAuthService kiteAuthService;
+
+    private volatile KiteConfig cfg;
+    private final ObjectMapper om = new ObjectMapper();
+
+    @Activate @Modified
+    protected void activate(KiteConfig cfg) {
+        this.cfg = cfg;
+        log.info(CYAN + "🔌 KiteConnector activated with baseUrl=" + cfg.baseUrl() + RESET);
+    }
+
+    @Override
+    public String brokerCode() { return "ZERODHA"; }
+
+    @Override
+    public List<BrokerAccountRef> discoverAccounts() {
+        log.info(CYAN + "🔍 Discovering Zerodha accounts..." + RESET);
+        List<BrokerAccountRef> accounts = registry.findActiveAccounts(brokerCode());
+        log.info(GREEN + "✅ Found {} active accounts for Zerodha" + RESET, accounts.size());
+        return accounts;
+    }
+
+
+    @Override
+    public PortfolioSnapshot fetchPortfolio(BrokerAccountRef acc) throws BrokerException {
+        log.info(YELLOW + "📥 Fetching portfolio for accountId={}..." + RESET, acc.userBrokerAccountId);
+
+        try {
+            // 1️⃣ Exchange request_token for access_token via KiteAuthService
+            String accessToken = kiteAuthService.getAccessTokenAndStoreToken(
+                    acc.requestToken,
+                    "ZERODHA",
+                    acc.getBrokerAccountRef(),
+                    acc.getApiKey(),
+                    acc.getApiSecrete()
+            );
+
+            if (StringUtils.isEmpty(accessToken)) {
+                log.error(RED + "❌ Failed to fetch access token for accountId={}" + RESET, acc.userBrokerAccountId);
+                throw new BrokerException("Failed to fetch access token for accountId=" + acc.userBrokerAccountId, -1, null);
+            }
+
+            log.info(GREEN + "✅ Access token fetched successfully for accountId={}" + RESET, acc.userBrokerAccountId);
+
+            // 2️⃣ Fetch holdings via REST
+            Map<String, String> headers = new HashMap<>();
+            headers.put("X-Kite-Version", "3");
+            headers.put("Authorization", "token " + acc.getApiKey() + ":" + accessToken);
+
+            String holdingsJson = http.get(cfg.baseUrl() + "/portfolio/holdings", headers,1000);
+            List<HoldingItem> holdings = mapKiteHoldings(holdingsJson);
+            log.info(GREEN + "✅ Holdings fetched: {} instruments" + RESET, holdings.size());
+
+// 3️⃣ Fetch positions via REST
+            String positionsJson = http.get(cfg.baseUrl() + "/portfolio/positions", headers,1000);
+            List<PositionItem> positions = mapKitePositions(positionsJson);
+            log.info(GREEN + "✅ Positions fetched: {} items" + RESET, positions.size());
+
+// 4️⃣ Fetch margins/funds via REST
+            String marginJson = http.get(cfg.baseUrl() + "/portfolio/margins/equity", headers,1000);
+            CashSummary cash = mapKiteFunds(marginJson);
+            log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
+
+
+            return new PortfolioSnapshot(holdings, positions, cash, Instant.now());
+
+        } catch (Exception e) {
+            log.error(RED + "❌ Error fetching portfolio: {}" + RESET, e.getMessage(), e);
+            throw new BrokerException("Kite fetch failed: " + e.getMessage(), -1, e);
+        }
+    }
+
+
+    private String kiteInferInstr(String product, String optionType, String expiry){
+        if (StringUtils.isNotEmpty(optionType)) return "OPT";
+        if (StringUtils.isNotEmpty(expiry) || "FUT".equalsIgnoreCase(product)) return "FUT";
+        return "EQUITY";
+    }
+
+
+    private static <T> T unchecked(CallableEx<T> c){ try { return c.call(); } catch(Exception e){ throw new RuntimeException(e); } }
+    @FunctionalInterface private interface CallableEx<T>{ T call() throws Exception; }
+
+    private void ensure2xx(HttpResponse<?> r, String ctx) throws BrokerException {
+        if (r.statusCode() / 100 != 2) {
+            log.warn(RED + "⚠️ Kite {} HTTP {} -> {}" + RESET, ctx, r.statusCode(), r.body());
+            throw new BrokerException("Kite "+ctx+" HTTP "+r.statusCode()+": "+r.body(), r.statusCode(), null);
+        }
+    }
+
+    private List<HoldingItem> mapKiteHoldings(String json) throws Exception {
+        List<HoldingItem> out = new ArrayList<>();
+        JsonNode root = om.readTree(json).path("data");
+        for (JsonNode n : root) {
+            HoldingItem h = new HoldingItem();
+            h.symbol = n.path("tradingsymbol").asText();
+            h.exchange = n.path("exchange").asText("NSE");
+            h.instrumentType = "EQUITY";
+            h.quantity = BigDecimal.valueOf(Integer.valueOf(n.path("quantity").asText("0")));
+            h.avgCost = new BigDecimal(n.path("average_price").asText("0"));
+            h.isin = n.path("isin").asText(null);
+            out.add(h);
+        }
+        return out;
+    }
+
+    private List<PositionItem> mapKitePositions(String json) throws Exception {
+        List<PositionItem> out = new ArrayList<>();
+        JsonNode net = om.readTree(json).path("data").path("net");
+        for (JsonNode n : net) {
+            PositionItem p = new PositionItem();
+            p.symbol = n.path("tradingsymbol").asText();
+            p.exchange = n.path("exchange").asText("NSE");
+            p.instrumentType = kiteInferInstr(n);
+            p.expiry = n.path("expiry").asText(null);
+            p.strike = new BigDecimal(n.path("strike").asText("0"));
+            p.optionType = n.path("option_type").asText(null);
+            p.side = n.path("quantity").asInt() >= 0 ? "LONG" : "SHORT";
+            p.quantity = new BigDecimal(n.path("quantity").asText("0"));
+            p.avgPrice = new BigDecimal(n.path("average_price").asText("0"));
+            p.pnlRealized = new BigDecimal(n.path("pnl").asText("0"));
+            p.pnlUnrealized = new BigDecimal(n.path("unrealised").asText("0"));
+            out.add(p);
+        }
+        return out;
+    }
+
+    private String kiteInferInstr(JsonNode n){
+        String product = n.path("product").asText("");
+        String opt = n.path("option_type").asText("");
+        if (!opt.isEmpty()) return "OPT";
+        if (n.hasNonNull("expiry") || "FUT".equalsIgnoreCase(product)) return "FUT";
+        return "EQUITY";
+    }
+
+    private CashSummary mapKiteFunds(String json) throws Exception {
+        CashSummary c = new CashSummary();
+        JsonNode d = om.readTree(json).path("data").path("equity");
+        c.available = new BigDecimal(d.path("available").path("cash").asText("0"));
+        c.used = new BigDecimal(d.path("utilised").path("debits").asText("0"));
+        c.pnlRealizedToday = new BigDecimal(d.path("pnl").asText("0"));
+        c.pnlUnrealized = BigDecimal.ZERO;
+        return c;
+    }
+}
+===== pm/connectors/kite/impl/KiteAuthServiceImpl.java =====
+package com.pm.connectors.kite.impl;
+
+import com.pm.connectors.kite.KiteAuthService;
+import com.pm.dao.DataSourcePoolProviderService;
+import com.GenericeConstants;
+import com.pm.net.HttpClientService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.apache.commons.lang3.StringUtils;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.net.http.HttpResponse;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.HashMap;
+import java.util.Map;
+
+@Component(service = KiteAuthService.class, immediate = true)
+public class KiteAuthServiceImpl implements KiteAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(KiteAuthServiceImpl.class);
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    @Reference
+    private HttpClientService http;
+
+    private static final ObjectMapper om = new ObjectMapper();
+    private String sql;
+
+    private DataSource getDataSource() {
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+    }
+
+    public void refreshTokensFromBrokerAccounts() {
+        String sql = "SELECT user_id, broker_name, broker_account_ref, api_key, api_secret, request_token " +
+                "FROM user_broker_account WHERE request_token IS NOT NULL";
+
+        try (Connection con = getDataSource().getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                String userId = rs.getString("user_id");
+                String brokerName = rs.getString("broker_name");
+                String brokerAccountRef = rs.getString("broker_account_ref");
+                String apiKey = rs.getString("api_key");
+                String apiSecret = rs.getString("api_secret");
+                String requestToken = rs.getString("request_token");
+
+                if (StringUtils.isNotBlank(requestToken)) {
+                    String accessToken = getAccessTokenAndStoreToken(requestToken, brokerName, brokerAccountRef, apiKey, apiSecret);
+                    if (StringUtils.isNotEmpty(accessToken)) {
+                        log.info("✅ Token refreshed for user={} broker={} account={}", userId, brokerName, brokerAccountRef);
+                    } else {
+                        log.warn("⚠️ Token refresh failed for user={} broker={} account={}", userId, brokerName, brokerAccountRef);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Error refreshing tokens from broker_accounts", e);
+        }
+    }
+
+    @Override
+    public String getAccessTokenAndStoreToken(String requestToken, String brokerName,
+                                              String brokerAccountRef, String apiKey, String apiSecret) {
+        try {
+            // 1️⃣ Check if a valid access token exists
+            String existingToken = fetchExistingAccessToken(brokerName, brokerAccountRef);
+            if (StringUtils.isNotEmpty(existingToken) && isAccessTokenValid(existingToken, apiKey)) {
+                log.info("✅ Using existing valid access token for broker={} / account={}", brokerName, brokerAccountRef);
+                return existingToken;
+            }
+
+            // 2️⃣ If no valid token, request new access token
+            log.info("Requesting new access token for broker={} / account={}", brokerName, brokerAccountRef);
+
+            String url = "https://api.kite.trade/session/token";
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Accept", "application/json");
+
+            String body = String.format("api_key=%s&request_token=%s&checksum=%s",
+                    apiKey, requestToken, generateChecksum(apiKey, requestToken, apiSecret));
+
+            String responseJson = http.post(url, headers, body, 5000);
+            JsonNode userNode = om.readTree(responseJson).path("data");
+            String accessToken = userNode.path("access_token").asText();
+            String publicToken = userNode.path("public_token").asText();
+            long tokenExpiry = 24 * 60 * 60;
+
+            Long brokerAccountId = getBrokerAccountId(userNode.path("user_id").asText(), brokerName, brokerAccountRef);
+            if (brokerAccountId == null) {
+                log.error("Broker account not found for user {} / broker {} / account {}",
+                        userNode.path("user_id").asText(), brokerName, brokerAccountRef);
+                return null;
+            }
+
+            // 3️⃣ Save new token in DB
+            upsertBrokerToken(brokerAccountId, String.valueOf(brokerAccountId), brokerName,
+                    accessToken, publicToken, String.valueOf(tokenExpiry));
+
+            log.info("✅ New access token stored successfully for broker={} / account={}", brokerName, brokerAccountRef);
+            return accessToken;
+
+        } catch (Exception e) {
+            log.error("Exception during access token fetch: {}", e.getMessage(), e);
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    private String generateChecksum(String apiKey, String requestToken, String apiSecret) {
+        // Kite expects SHA256(apiKey + requestToken + apiSecret)
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest((apiKey + requestToken + apiSecret).getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate checksum", e);
+        }
+    }
+
+    private Long getBrokerAccountId(String userId, String brokerName, String brokerAccountRef) {
+        if (StringUtils.isBlank(userId)) {
+            log.error("UserId is empty, cannot fetch broker account for broker={} / account={}", brokerName, brokerAccountRef);
+            return null;
+        }
+
+        try (Connection con = getDataSource().getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     "SELECT *\n" +
+                             "FROM user_broker_account uba" +
+                             "INNER JOIN broker_token bt" +
+                             "    ON bt.id = uba.account_id" +
+                             "WHERE bt.broker_name = ?" +
+                             "  AND uba.broker_account_ref = ?"
+             )) {
+            ps.setString(1, brokerName);
+            ps.setString(2, brokerAccountRef);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("user_id");
+                log.warn("Broker account not found for user {} / broker {} / account {}", userId, brokerName, brokerAccountRef);
+            }
+        } catch (NumberFormatException nfe) {
+            log.error("Invalid userId '{}' for broker={} / account={}", userId, brokerName, brokerAccountRef, nfe);
+        } catch (Exception e) {
+            log.error("Error fetching broker_account_id: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+
+    private void upsertBrokerToken(Long brokerAccountId, String userId, String brokerName,
+                                   String accessToken, String refreshToken, String tokenExpiry) {
+        try (Connection con = getDataSource().getConnection()) {
+            // Create table if not exists
+            String createTableSQL = "CREATE TABLE IF NOT EXISTS broker_token (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                    "user_id BIGINT NOT NULL," +
+                    "broker_account_id BIGINT NOT NULL," +
+                    "broker_name VARCHAR(50)," +
+                    "access_token VARCHAR(512)," +
+                    "refresh_token VARCHAR(512)," +
+                    "token_expiry VARCHAR(128)," +
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+                    "UNIQUE KEY uq_broker_account (broker_account_id)" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            try (PreparedStatement ps = con.prepareStatement(createTableSQL)) { ps.execute(); }
+
+            // Upsert token
+            String upsertSQL = "INSERT INTO broker_token " +
+                    "(user_id, broker_account_id, broker_name, access_token, refresh_token, token_expiry) " +
+                    "VALUES (?, ?, ?, ?, ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE " +
+                    "access_token=VALUES(access_token), " +
+                    "refresh_token=VALUES(refresh_token), " +
+                    "token_expiry=VALUES(token_expiry), " +
+                    "updated_at=CURRENT_TIMESTAMP";
+
+            try (PreparedStatement ps = con.prepareStatement(upsertSQL)) {
+                ps.setLong(1, Long.parseLong(userId));
+                ps.setLong(2, brokerAccountId);
+                ps.setString(3, brokerName);
+                ps.setString(4, accessToken);
+                ps.setString(5, refreshToken);
+                ps.setString(6, tokenExpiry);
+                ps.executeUpdate();
+                log.info("Broker token upserted for broker_account_id {}", brokerAccountId);
+            }
+
+        } catch (Exception e) {
+            log.error("Exception during broker_token insert/update: {}", e.getMessage(), e);
+        }
+    }
+
+    // Fetch existing access token from DB
+    private String fetchExistingAccessToken(String brokerName, String brokerAccountRef) {
+        sql = "SELECT bt.access_token FROM broker_token bt " +
+                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+                "WHERE bt.broker_name = ? AND uba.broker_account_ref = ?";
+        try (Connection con = getDataSource().getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     sql
+             )) {
+            ps.setString(1, brokerName);
+            ps.setString(2, brokerAccountRef);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("bt.access_token");
+            }
+        } catch (Exception e) {
+            log.error("Error fetching existing access token: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+    // Validate token by calling Kite API
+    private boolean isAccessTokenValid(String accessToken, String apiKey) {
+        try {
+            String url = "https://api.kite.trade/user/profile";
+            Map<String, String> headers = Map.of(
+                    "X-Kite-Version", "3",
+                    "Authorization", "token " + apiKey + ":" + accessToken
+            );
+            String response = http.get(url, headers,  3000);  // Empty body for GET-like POST
+            JsonNode root = om.readTree(response);
+            return root.path("status").asText("").equalsIgnoreCase("success");
+        } catch (Exception e) {
+            log.warn("Access token validation failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+}
+===== pm/connectors/upstox/UpstoxConnector.java =====
+package com.pm.connectors.upstox;
+
+import com.fasterxml.jackson.databind.*;
+import com.pm.config.UpstoxConfig;
+import com.pm.connectors.BrokerConnector;
+import com.pm.dto.*;
+import com.pm.net.HttpClientService;
+import com.pm.services.AccountRegistryService;
+import com.pm.utils.Retry;
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.http.HttpResponse;
+import java.time.Instant;
+import java.util.*;
+import java.math.BigDecimal;
+
+@Component(service = BrokerConnector.class, immediate = true)
+public class UpstoxConnector implements BrokerConnector {
+
+    private static final Logger log = LoggerFactory.getLogger(UpstoxConnector.class);
+
+    // ANSI colors
+    private static final String RESET  = "\u001B[0m";
+    private static final String RED    = "\u001B[31m";
+    private static final String GREEN  = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN   = "\u001B[36m";
+
+    @Reference private HttpClientService http;
+    @Reference private AccountRegistryService registry;
+
+    private volatile UpstoxConfig cfg;
+    private final ObjectMapper om = new ObjectMapper();
+
+    @Activate @Modified
+    protected void activate(UpstoxConfig cfg) {
+        this.cfg = cfg;
+        log.info(GREEN + "✅ UpstoxConnector activated with baseUrl={} " + RESET, cfg.baseUrl());
+    }
+
+    @Override public String brokerCode() { return "UPSTOX"; }
+
+    @Override
+    public List<BrokerAccountRef> discoverAccounts() {
+        log.info(CYAN + "🔍 Discovering UPSTOX accounts from registry..." + RESET);
+        List<BrokerAccountRef> accounts = registry.findActiveAccounts("UPSTOX");
+        log.info(GREEN + "✅ {} accounts discovered for UPSTOX" + RESET, accounts.size());
+        return accounts;
+    }
+
+    @Override
+    public PortfolioSnapshot fetchPortfolio(BrokerAccountRef acc) throws BrokerException {
+        log.info(CYAN + "📡 Fetching portfolio for accountId={} broker={}" + RESET, acc.userBrokerAccountId, brokerCode());
+        try {
+            String auth = "Bearer " + acc.accessToken;
+
+            HttpResponse<String> h = Retry.exec(3, 300, () ->
+                    unchecked(() -> http.get(cfg.baseUrl()+"/portfolio/holdings", auth, 15000)));
+            ensure2xx(h, "holdings");
+            List<HoldingItem> holdings = mapHoldings(h.body());
+            log.info(GREEN + "✅ Holdings fetched: {} items" + RESET, holdings.size());
+
+            HttpResponse<String> p = Retry.exec(3, 300, () ->
+                    unchecked(() -> http.get(cfg.baseUrl()+"/portfolio/positions", auth, 15000)));
+            ensure2xx(p, "positions");
+            List<PositionItem> positions = mapPositions(p.body());
+            log.info(GREEN + "✅ Positions fetched: {} items" + RESET, positions.size());
+
+            HttpResponse<String> f = Retry.exec(3, 300, () ->
+                    unchecked(() -> http.get(cfg.baseUrl()+"/funds/summary", auth, 15000)));
+            ensure2xx(f, "funds");
+            CashSummary cash = mapFunds(f.body());
+            log.info(GREEN + "✅ Cash summary fetched: available={} used={}" + RESET, cash.available, cash.used);
+
+            return new PortfolioSnapshot(holdings, positions, cash, Instant.now());
+        } catch (BrokerException be) {
+            log.error(RED + "❌ BrokerException while fetching portfolio: {}" + RESET, be.getMessage());
+            throw be;
+        } catch (Exception e) {
+            log.error(RED + "❌ Unexpected error in Upstox fetch: {}" + RESET, e.getMessage(), e);
+            throw new BrokerException("Upstox fetch failed: " + e.getMessage(), -1, e);
+        }
+    }
+
+    private static <T> T unchecked(CallableEx<T> c){ try { return c.call(); } catch(Exception e){ throw new RuntimeException(e); } }
+    @FunctionalInterface private interface CallableEx<T>{ T call() throws Exception; }
+
+    private void ensure2xx(HttpResponse<?> r, String ctx) throws BrokerException {
+        if (r.statusCode() / 100 != 2) {
+            log.warn(YELLOW + "⚠️ Non-2xx response for {}: HTTP {} body={}" + RESET, ctx, r.statusCode(), r.body());
+            throw new BrokerException("Upstox "+ctx+" HTTP "+r.statusCode()+": "+r.body(), r.statusCode(), null);
+        }
+    }
+
+    private List<HoldingItem> mapHoldings(String json) throws Exception {
+        List<HoldingItem> out = new ArrayList<>();
+        JsonNode arr = om.readTree(json).path("data");
+        for (JsonNode n : arr) {
+            HoldingItem h = new HoldingItem();
+            h.symbol = n.path("symbol").asText();
+            h.exchange = n.path("exchange").asText("NSE");
+            h.instrumentType = "EQUITY";
+            h.quantity = new BigDecimal(n.path("quantity").asText("0"));
+            h.avgCost = new BigDecimal(n.path("average_price").asText("0"));
+            h.isin = n.path("isin").asText(null);
+            out.add(h);
+        }
+        return out;
+    }
+
+    private List<PositionItem> mapPositions(String json) throws Exception {
+        List<PositionItem> out = new ArrayList<>();
+        JsonNode arr = om.readTree(json).path("data");
+        for (JsonNode n : arr) {
+            PositionItem p = new PositionItem();
+            p.symbol = n.path("tradingsymbol").asText(n.path("symbol").asText());
+            p.exchange = n.path("exchange").asText("NSE");
+            p.instrumentType = inferInstr(n);
+            p.expiry = n.path("expiry").asText(null);
+            p.strike = new BigDecimal(n.path("strike_price").asText("0"));
+            p.optionType = n.path("option_type").asText(null);
+            p.side = n.path("net_qty").asInt() >= 0 ? "LONG" : "SHORT";
+            p.quantity = new BigDecimal(n.path("net_qty").asText("0"));
+            p.avgPrice = new BigDecimal(n.path("avg_price").asText("0"));
+            p.pnlRealized = new BigDecimal(n.path("realized_profit").asText("0"));
+            p.pnlUnrealized = new BigDecimal(n.path("unrealized_profit").asText("0"));
+            out.add(p);
+        }
+        return out;
+    }
+
+    private String inferInstr(JsonNode n){
+        if (n.hasNonNull("option_type")) return "OPT";
+        if (n.hasNonNull("expiry")) return "FUT";
+        return "EQUITY";
+    }
+
+    private CashSummary mapFunds(String json) throws Exception {
+        CashSummary c = new CashSummary();
+        JsonNode d = om.readTree(json).path("data");
+        c.available = new BigDecimal(d.path("available_margin").asText("0"));
+        c.used = new BigDecimal(d.path("utilised_margin").asText("0"));
+        c.pnlRealizedToday = BigDecimal.ZERO;
+        c.pnlUnrealized = BigDecimal.ZERO;
+        return c;
+    }
+}
+===== pm/dao/DataSourcePoolProviderService.java =====
+package com.pm.dao;
+
+import javax.sql.DataSource;
+
+public interface DataSourcePoolProviderService {
+    DataSource getDataSourceByName(String name);
+}
+===== pm/dao/PortfolioDao.java =====
+package com.pm.dao;
+
+
+import com.pm.dto.*;
+import java.sql.Connection;
+import java.util.List;
+
+public interface PortfolioDao {
+    void upsertAccountSnapshot(Connection c, BrokerAccountRef acc, PortfolioSnapshot snap);
+}
+
+===== pm/dao/impl/DataSourcePoolProviderServiceImpl.java =====
+package com.pm.dao.impl;
+
+import com.pm.dao.DataSourcePoolProviderService;
+import com.pm.utils.OsgiUtils;
+import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.InvalidSyntaxException;
+import org.osgi.framework.ServiceReference;
+
+
+@Component(service = DataSourcePoolProviderService.class, immediate = true)
+public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProviderService {
+
+    private static final Logger log = LoggerFactory.getLogger(DataSourcePoolProviderServiceImpl.class);
+
+    private BundleContext bundleContext;
+
+    // ANSI colors
+    private static final String RESET  = "\u001B[0m";
+    private static final String RED    = "\u001B[31m";
+    private static final String GREEN  = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN   = "\u001B[36m";
+
+    @Activate
+    protected void activate(ComponentContext ctx) {
+        this.bundleContext = ctx.getBundleContext();
+    }
+
+    /**
+     * Lookup a DataSource by its OSGi property (datasource.name).
+     */
+    @SuppressWarnings("unchecked")
+    public DataSource getDataSourceByName(String name) {
+        try {
+            ServiceReference<DataSource>[] refs =
+                    (ServiceReference<DataSource>[]) bundleContext.getServiceReferences(DataSource.class.getName(), null);
+
+            if (refs == null || refs.length == 0) {
+                log.warn("{}⚠️ No DataSource services registered in OSGi!{}", RED, RESET);
+                return null;
+            }
+
+            for (ServiceReference<DataSource> ref : refs) {
+                log.debug("{}🔍 Checking DataSource properties...{}", CYAN, RESET);
+                OsgiUtils.printDataSourceProps(ref);
+
+                if (OsgiUtils.hasDataSourceName(ref, name)) {
+                    DataSource ds = bundleContext.getService(ref);
+                    log.info("{}✅ Found matching DataSource: {} = {}{}", GREEN, name, ds, RESET);
+                    return ds;
+                }
+            }
+
+            log.warn("{}⚠️ No matching DataSource found for name={}{}", RED, name, RESET);
+
+        } catch (InvalidSyntaxException e) {
+            log.error("{}❌ Invalid OSGi filter while looking up datasource: {}{}", RED, e.getMessage(), RESET, e);
+            throw new RuntimeException("Invalid filter for datasource lookup", e);
+        }
+        return null;
+    }
+
+}
+===== pm/dao/impl/PortfolioDaoImpl.java =====
+package com.pm.dao.impl;
+
+import com.pm.dao.PortfolioDao;
+import com.pm.dto.*;
+import com.pm.services.InstrumentResolver;
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.sql.*;
+
+@Component(service = PortfolioDao.class, immediate = true)
+public class PortfolioDaoImpl implements PortfolioDao {
+
+    private static final Logger log = LoggerFactory.getLogger(PortfolioDaoImpl.class);
+
+    @Reference
+    private InstrumentResolver resolver;
+
+    // ANSI colors
+    private static final String RESET  = "\u001B[0m";
+    private static final String RED    = "\u001B[31m";
+    private static final String GREEN  = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN   = "\u001B[36m";
+
+
+    @Override
+    public void upsertAccountSnapshot(Connection c, BrokerAccountRef acc, PortfolioSnapshot snap) {
+        log.info("{}📊 Upserting portfolio snapshot for brokerAccountId={} asOf={}{}",
+                CYAN, acc.userBrokerAccountId, snap.asOf, RESET);
+
+        try {
+            // 1) HOLDINGS
+            try (PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO holding(user_broker_account_id, instrument_id, quantity, avg_cost, updated_at) " +
+                            "VALUES(?,?,?,?,NOW()) " +
+                            "ON DUPLICATE KEY UPDATE quantity=VALUES(quantity), avg_cost=VALUES(avg_cost), updated_at=NOW()")) {
+
+                for (HoldingItem h : snap.holdings) {
+                    long iid = resolver.resolveForHolding(h);
+                    ps.setLong(1, acc.userBrokerAccountId);
+                    ps.setLong(2, iid);
+                    ps.setBigDecimal(3, h.quantity);
+                    ps.setBigDecimal(4, h.avgCost);
+                    ps.addBatch();
+                    log.debug("{}➕ Holding upsert queued: accountId={}, instrumentId={}, qty={}, cost={}{}",
+                            GREEN, acc.userBrokerAccountId, iid, h.quantity, h.avgCost, RESET);
+                }
+                int[] results = ps.executeBatch();
+                log.info("{}✅ Holdings upserted, batchSize={} rowsUpdated={}{}",
+                        GREEN, snap.holdings.size(), results.length, RESET);
+            }
+
+            // 2) POSITIONS
+            try (PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO position(user_broker_account_id, instrument_id, side, quantity, avg_price, pnl_realized, updated_at) " +
+                            "VALUES(?,?,?,?,?,?,NOW()) " +
+                            "ON DUPLICATE KEY UPDATE side=VALUES(side), quantity=VALUES(quantity), avg_price=VALUES(avg_price), pnl_realized=VALUES(pnl_realized), updated_at=NOW()")) {
+
+                for (PositionItem p : snap.positions) {
+                    long iid = resolver.resolveForPosition(p);
+                    ps.setLong(1, acc.userBrokerAccountId);
+                    ps.setLong(2, iid);
+                    ps.setString(3, p.side);
+                    ps.setBigDecimal(4, p.quantity);
+                    ps.setBigDecimal(5, p.avgPrice);
+                    ps.setBigDecimal(6, p.pnlRealized == null ? java.math.BigDecimal.ZERO : p.pnlRealized);
+                    ps.addBatch();
+                    log.debug("{}➕ Position upsert queued: accountId={}, instrumentId={}, side={}, qty={}, price={}, pnl={}{}",
+                            GREEN, acc.userBrokerAccountId, iid, p.side, p.quantity, p.avgPrice, p.pnlRealized, RESET);
+                }
+                int[] results = ps.executeBatch();
+                log.info("{}✅ Positions upserted, batchSize={} rowsUpdated={}{}",
+                        GREEN, snap.positions.size(), results.length, RESET);
+            }
+
+            // 3) CASH
+            try (PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO cash_snapshot(user_broker_account_id, as_of, available, used, created_at) VALUES(?,?,?,?,NOW())")) {
+                ps.setLong(1, acc.userBrokerAccountId);
+                ps.setTimestamp(2, Timestamp.from(snap.asOf));
+                ps.setBigDecimal(3, snap.cash.available);
+                ps.setBigDecimal(4, snap.cash.used);
+                int rows = ps.executeUpdate();
+                log.info("{}💰 Cash snapshot inserted: accountId={}, asOf={}, available={}, used={}, rows={}{}",
+                        GREEN, acc.userBrokerAccountId, snap.asOf, snap.cash.available, snap.cash.used, rows, RESET);
+            }
+
+        } catch (SQLException e) {
+            log.error("{}❌ Portfolio upsert failed for accountId={} : {}{}",
+                    RED, acc.userBrokerAccountId, e.getMessage(), RESET, e);
+            throw new RuntimeException("Portfolio upsert failed: " + e.getMessage(), e);
+        }
+    }
+
+}
+===== pm/dto/BrokerAccountRef.java =====
+package com.pm.dto;
+
+
+
+public class BrokerAccountRef {
+    public  long userId;
+    public  long userBrokerAccountId;
+    public  String brokerCode;
+    public  String externalAccountId; // e.g. clientId
+    public  String accessToken;       // decrypted short-lived access
+    public  String requestToken;       // decrypted short-lived access
+    public  String apiKey;       // decrypted short-lived access
+    public  String apiSecrete;       // decrypted short-lived access
+    public  String brokerAccountRef;       // decrypted short-lived access
+    public BrokerAccountRef(long userId, long ubaId, String brokerCode, String externalAccountId, String accessToken,String requestToken) {
+        this.userId = userId; this.userBrokerAccountId = ubaId; this.requestToken= requestToken;
+        this.brokerCode = brokerCode; this.externalAccountId = externalAccountId; this.accessToken = accessToken;
+    }
+
+    public long getUserId() {
+        return userId;
+    }
+
+    public long getUserBrokerAccountId() {
+        return userBrokerAccountId;
+    }
+
+    public String getBrokerCode() {
+        return brokerCode;
+    }
+
+    public String getExternalAccountId() {
+        return externalAccountId;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public String getRequestToken() {
+        return requestToken;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public String getApiSecrete() {
+        return apiSecrete;
+    }
+
+    public void setApiSecrete(String apiSecrete) {
+        this.apiSecrete = apiSecrete;
+    }
+
+    public void setUserId(long userId) {
+        this.userId = userId;
+    }
+
+    public void setUserBrokerAccountId(long userBrokerAccountId) {
+        this.userBrokerAccountId = userBrokerAccountId;
+    }
+
+    public void setBrokerCode(String brokerCode) {
+        this.brokerCode = brokerCode;
+    }
+
+    public void setExternalAccountId(String externalAccountId) {
+        this.externalAccountId = externalAccountId;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public void setRequestToken(String requestToken) {
+        this.requestToken = requestToken;
+    }
+
+    public String getBrokerAccountRef() {
+        return brokerAccountRef;
+    }
+
+    public void setBrokerAccountRef(String brokerAccountRef) {
+        this.brokerAccountRef = brokerAccountRef;
+    }
+
+    @Override
+    public String toString() {
+        return "BrokerAccountRef{" +
+                "userId=" + userId +
+                ", userBrokerAccountId=" + userBrokerAccountId +
+                ", brokerCode='" + brokerCode + '\'' +
+                ", externalAccountId='" + externalAccountId + '\'' +
+                ", accessToken='" + accessToken + '\'' +
+                ", requestToken='" + requestToken + '\'' +
+                '}';
+    }
+}
+
+===== pm/dto/BrokerException.java =====
+package com.pm.dto;
+
+public class BrokerException extends Exception {
+    public final int httpStatus;
+    public BrokerException(String msg, int status, Throwable cause){ super(msg,cause); this.httpStatus=status; }
+    public BrokerException(String msg){ this(msg, -1, null); }
+}
+===== pm/dto/CashSummary.java =====
+package com.pm.dto;
+
+import java.math.BigDecimal;
+
+public class CashSummary {
+    public BigDecimal available;
+    public BigDecimal used;
+    public BigDecimal pnlRealizedToday;
+    public BigDecimal pnlUnrealized;
+
+    public BigDecimal getAvailable() {
+        return available;
+    }
+
+    public void setAvailable(BigDecimal available) {
+        this.available = available;
+    }
+
+    public BigDecimal getUsed() {
+        return used;
+    }
+
+    public void setUsed(BigDecimal used) {
+        this.used = used;
+    }
+
+    public BigDecimal getPnlRealizedToday() {
+        return pnlRealizedToday;
+    }
+
+    public void setPnlRealizedToday(BigDecimal pnlRealizedToday) {
+        this.pnlRealizedToday = pnlRealizedToday;
+    }
+
+    public BigDecimal getPnlUnrealized() {
+        return pnlUnrealized;
+    }
+
+    public void setPnlUnrealized(BigDecimal pnlUnrealized) {
+        this.pnlUnrealized = pnlUnrealized;
+    }
+
+    @Override
+    public String toString() {
+        return "CashSummary{" +
+                "available=" + available +
+                ", used=" + used +
+                ", pnlRealizedToday=" + pnlRealizedToday +
+                ", pnlUnrealized=" + pnlUnrealized +
+                '}';
+    }
+}
+===== pm/dto/HoldingItem.java =====
+package com.pm.dto;
+
+import java.math.BigDecimal;
+
+public class HoldingItem {
+    public String symbol;       // e.g. "TCS", "SBIN"
+    public String isin;         // optional
+    public String exchange;     // NSE/BSE
+    public String instrumentType; // EQUITY/ETF/MF
+    public BigDecimal quantity;
+    public BigDecimal avgCost;  // per unit
+}
+===== pm/dto/PortfolioSnapshot.java =====
+package com.pm.dto;
+
+import java.time.Instant;
+import java.util.List;
+
+public class PortfolioSnapshot {
+    public final List<HoldingItem> holdings;
+    public final List<PositionItem> positions;
+    public final CashSummary cash;
+    public final Instant asOf;
+    public PortfolioSnapshot(List<HoldingItem> h, List<PositionItem> p, CashSummary c, Instant asOf){
+        this.holdings=h; this.positions=p; this.cash=c; this.asOf=asOf;
+    }
+}
+===== pm/dto/PositionItem.java =====
+package com.pm.dto;
+
+import java.math.BigDecimal;
+
+public class PositionItem {
+    public String symbol;
+    public String exchange;
+    public String instrumentType; // FUT/OPT/FX/COMMODITY or INTRADAY_EQUITY
+    public String expiry;         // yyyy-MM-dd for derivatives
+    public BigDecimal strike;     // if OPT
+    public String optionType;     // CE/PE
+    public String side;           // LONG/SHORT
+    public BigDecimal quantity;   // net open
+    public BigDecimal avgPrice;
+    public BigDecimal pnlRealized;   // realized till now (if broker provides)
+    public BigDecimal pnlUnrealized; // optional
+}
+===== pm/net/HttpClientService.java =====
+package com.pm.net;
+
+import java.net.http.*;
+import java.net.URI;
+import java.time.Duration;
+import java.util.Map;
+
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Component(service = HttpClientService.class, immediate = true)
+public class HttpClientService {
+
+    private static final Logger log = LoggerFactory.getLogger(HttpClientService.class);
+
+    // ANSI Colors for console logs
+    private static final String RESET = "\u001B[0m";
+    private static final String BLUE = "\u001B[34m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String RED = "\u001B[31m";
+    private static final String YELLOW = "\u001B[33m";
+
+    private HttpClient http;
+
+    @Activate
+    protected void activate() {
+        http = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .version(HttpClient.Version.HTTP_2)
+                .build();
+        log.info(GREEN + "✅ HttpClientService activated with HTTP/2 and 10s connect timeout." + RESET);
+    }
+
+    public HttpResponse<String> get(String url, String authHeader, int timeoutMs) throws Exception {
+        log.info(BLUE + "🌐 Sending HTTP GET Request: " + RESET + url +
+                (authHeader != null ? " " + YELLOW + "[Auth Header Present]" + RESET : " " + RED + "[No Auth]" + RESET));
+
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofMillis(timeoutMs))
+                .header("Authorization", authHeader == null ? "" : authHeader)
+                .header("Accept", "application/json")
+                .GET().build();
+
+        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+
+        if (res.statusCode() / 100 == 2) {
+            log.info(GREEN + "✅ Response " + res.statusCode() + " received successfully for: " + RESET + url);
+        } else {
+            log.warn(RED + "⚠️ Response " + res.statusCode() + " for: " + RESET + url +
+                    " | Body: " + res.body());
+        }
+
+        return res;
+    }
+    public String get(String url, Map<String, String> headers, int timeoutMs) throws Exception {
+        log.info(BLUE + "🌐 Sending HTTP GET Request: " + RESET + url);
+
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(timeoutMs))
+                .GET();
+
+        if (headers != null) {
+            headers.forEach((k, v) -> reqBuilder.header(k, v));
+        }
+
+        HttpRequest req = reqBuilder.build();
+
+        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+
+        if (res.statusCode() / 100 == 2) {
+            log.info(GREEN + "✅ Response " + res.statusCode() + " received successfully for: " + RESET + url);
+        } else {
+            log.warn(RED + "⚠️ Response " + res.statusCode() + " for: " + RESET + url +
+                    " | Body: " + res.body());
+        }
+
+        return res.body();
+    }
+    public String post(String url, Map<String, String> headers, String body, int timeoutMs) throws Exception {
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofMillis(timeoutMs))
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+
+        // Ensure Content-Type for form-urlencoded
+        reqBuilder.header("Content-Type", "application/x-www-form-urlencoded");
+
+        // Add additional headers if provided
+        if (headers != null) {
+            headers.forEach(reqBuilder::header);
+        }
+
+        HttpRequest req = reqBuilder.build();
+
+        log.info(BLUE + "🌐 Sending HTTP POST Request: " + RESET + url +
+                (headers != null && headers.containsKey("Authorization") ? " " + YELLOW + "[Auth Header Present]" + RESET : " " + RED + "[No Auth]" + RESET));
+
+        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+
+        if (res.statusCode() / 100 == 2) {
+            log.info(GREEN + "✅ POST Response " + res.statusCode() + " received for: " + RESET + url);
+        } else {
+            log.warn(RED + "⚠️ POST Response " + res.statusCode() + " for: " + RESET + url + " | Body: " + res.body());
+        }
+
+        return res.body(); // return JSON string only
+    }
+
+
+}
+===== pm/scheduler/PortfolioSyncScheduler.java =====
+package com.pm.scheduler;
+
+import com.pm.dao.DataSourcePoolProviderService;
+import com.pm.dao.impl.DataSourcePoolProviderServiceImpl;
+import com.pm.services.PortfolioSyncService;
+import org.osgi.service.component.annotations.*;
+import org.osgi.service.metatype.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+
+@Designate(ocd = PortfolioSyncScheduler.Config.class)
+@Component(service = Runnable.class, immediate = true)
+public class PortfolioSyncScheduler implements Runnable {
+
+    private static final Logger log = LoggerFactory.getLogger(PortfolioSyncScheduler.class);
+
+    @Reference
+    private PortfolioSyncService sync;
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderServiceImpl;
+
+    private Config config;
+
+    @ObjectClassDefinition(
+            name = "Portfolio Sync Scheduler",
+            description = "Scheduler that syncs user portfolios from all brokers"
+    )
+    public @interface Config {
+        @AttributeDefinition(
+                name = "Enable scheduler",
+                description = "Enable or disable portfolio sync job"
+        )
+        boolean enable() default true;
+
+        @AttributeDefinition(
+                name = "Cron expression",
+                description = "CRON expression for when to run (default: every 5 minutes)"
+        )
+        String scheduler_expression() default "0 0/5 * * * ?";
+
+        @AttributeDefinition(
+                name = "Allow concurrent execution",
+                description = "Whether job can run in parallel"
+        )
+        boolean scheduler_concurrent() default false;
+    }
+
+    @Activate
+    protected void activate(Config config) {
+        this.config = config;
+        log.info("✅ PortfolioSyncScheduler activated with cron={}, enabled={}",
+                config.scheduler_expression(), config.enable());
+    }
+
+    @Modified
+    protected void modified(Config config) {
+        this.config = config;
+        log.info("🔄 PortfolioSyncScheduler config modified: cron={}, enabled={}",
+                config.scheduler_expression(), config.enable());
+    }
+
+    @Override
+    public void run() {
+        if (!config.enable()) {
+            log.debug("⚠️ PortfolioSyncScheduler disabled. Skipping run.");
+            return;
+        }
+        try {
+            log.info("▶️ Running Portfolio Sync job...");
+            sync.syncAllBrokersOnce();
+            log.info("✅ Portfolio Sync job completed successfully.");
+        } catch (Exception e) {
+            log.error("❌ Error during portfolio sync: {}", e.getMessage(), e);
+        }
+    }
+}
+===== pm/services/AccountRegistryService.java =====
+package com.pm.services;
+
+
+import com.pm.dto.BrokerAccountRef;
+import java.util.List;
+
+public interface AccountRegistryService {
+    /** Return all active accounts for this broker with fresh access tokens. */
+    List<BrokerAccountRef> findActiveAccounts(String brokerCode);
+}
+===== pm/services/InstrumentResolver.java =====
+package com.pm.services;
+
+
+import com.pm.dto.HoldingItem;
+import com.pm.dto.PositionItem;
+
+public interface InstrumentResolver {
+    long resolveForHolding(HoldingItem h);   // returns instrument.id
+    long resolveForPosition(PositionItem p); // "
+}
+===== pm/services/PortfolioSyncService.java =====
+package com.pm.services;
+
+
+public interface PortfolioSyncService {
+    void syncAllBrokersOnce();
+}
+===== pm/services/impl/AccountRegistryServiceImpl.java =====
+package com.pm.services.impl;
+
+import com.GenericeConstants;
+import com.pm.dao.DataSourcePoolProviderService;
+import com.pm.dto.BrokerAccountRef;
+import com.pm.services.AccountRegistryService;
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.*;
+
+@Component(service = AccountRegistryService.class, immediate = true)
+public class AccountRegistryServiceImpl implements AccountRegistryService {
+
+    private static final Logger log = LoggerFactory.getLogger(AccountRegistryServiceImpl.class);
+
+    // ANSI Colors for logging
+    private static final String RESET = "\u001B[0m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String RED = "\u001B[31m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String BLUE = "\u001B[34m";
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    @Override
+    public List<BrokerAccountRef> findActiveAccounts(String brokerCode) {
+        String sql =
+                "SELECT * " +
+                        "FROM user_broker_account uba " +
+                        "JOIN broker b ON b.broker_id = uba.broker_id " +
+                        "JOIN broker_token tok ON tok.broker_account_id = uba.account_id " +
+                        "WHERE b.code = ? " +
+                        "AND uba.status = 'ACTIVE' "+
+                       "AND (tok.token_expiry IS NULL OR tok.token_expiry > NOW())";
+
+        log.info(BLUE + "🔍 Looking up active accounts for broker: " + RESET + brokerCode);
+        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
+                GenericeConstants.MYSQL_PORTFOLIO_MGMT
+        );
+        List<BrokerAccountRef> out = new ArrayList<>();
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setString(1, brokerCode);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long accountId = rs.getLong("account_id");
+                    long userId = rs.getLong("user_id");
+                    String brokerAccountRef = rs.getString("broker_account_ref");
+                    String accessToken = rs.getString("access_token");
+                    String requestToken = rs.getString("request_token");
+                    String api_secret = rs.getString("api_secret");
+                    String api_key = rs.getString("api_key");
+                    String brokerAccountRefStr = rs.getString("broker_account_ref");
+                    BrokerAccountRef newBrokerAccountRef = new BrokerAccountRef(userId, accountId, brokerCode, brokerAccountRef, accessToken, requestToken);
+                    newBrokerAccountRef.setApiKey(api_key);
+                    newBrokerAccountRef.setApiSecrete(api_secret);
+                    newBrokerAccountRef.setBrokerAccountRef(brokerAccountRefStr);
+                    out.add(newBrokerAccountRef);
+
+                    log.info(GREEN + "✅ Found active account: " + RESET +
+                            "AccountId=" + accountId + ", UserId=" + userId + ", Ref=" + brokerAccountRef);
+                }
+            }
+
+            if (out.isEmpty()) {
+                log.warn(YELLOW + "⚠️ No active accounts found for broker: " + RESET + brokerCode);
+            } else {
+                log.info(GREEN + "📊 Total active accounts found: " + RESET + out.size());
+            }
+
+        } catch (SQLException e) {
+            log.error(RED + "❌ Account discovery failed for broker: " + brokerCode + " | Error: " + e.getMessage() + RESET, e);
+            throw new RuntimeException("Account discovery failed: " + e.getMessage(), e);
+        }
+
+        return out;
+    }
+}
+===== pm/services/impl/InstrumentResolverImpl.java =====
+package com.pm.services.impl;
+
+import com.GenericeConstants;
+import com.pm.dao.DataSourcePoolProviderService;
+import com.pm.dto.*;
+import com.pm.services.InstrumentResolver;
+import org.osgi.service.component.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.sql.*;
+
+@Component(service = InstrumentResolver.class, immediate = true)
+public class InstrumentResolverImpl implements InstrumentResolver {
+
+    private static final Logger log = LoggerFactory.getLogger(InstrumentResolverImpl.class);
+
+    // ANSI Colors
+    private static final String RESET  = "\u001B[0m";
+    private static final String GREEN  = "\u001B[32m";
+    private static final String RED    = "\u001B[31m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String BLUE   = "\u001B[34m";
+
+    private DataSource ds;
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    @Activate
+    protected void activate() {
+        this.ds = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        log.info(GREEN + "✅ InstrumentResolverImpl activated. DataSource initialized." + RESET);
+    }
+
+    @Override
+    public long resolveForHolding(HoldingItem h) {
+        log.info(BLUE + "🔍 Resolving Holding: " + RESET +
+                "ISIN=" + h.isin + ", Exchange=" + h.exchange + ", Symbol=" + h.symbol);
+
+        try (Connection c = ds.getConnection()) {
+            Long id = byIsin(c, h.isin);
+            if (id != null) {
+                log.info(GREEN + "✅ Found instrument by ISIN: " + RESET + id);
+                return id;
+            }
+
+            id = bySymbol(c, h.exchange, h.symbol);
+            if (id != null) {
+                log.info(GREEN + "✅ Found instrument by Symbol: " + RESET + id);
+                return id;
+            }
+
+            long newId = insertStub(c, h.exchange, h.symbol, h.instrumentType, h.isin);
+            log.warn(YELLOW + "⚠️ No match found. Inserted new stub instrument with ID=" + newId + RESET);
+            return newId;
+
+        } catch (SQLException e) {
+            log.error(RED + "❌ Error resolving Holding instrument: " + e.getMessage() + RESET, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public long resolveForPosition(PositionItem p) {
+        log.info(BLUE + "🔍 Resolving Position: " + RESET +
+                "Exchange=" + p.exchange + ", Symbol=" + p.symbol +
+                ", Expiry=" + p.expiry + ", Strike=" + p.strike + ", OptType=" + p.optionType);
+
+        try (Connection c = ds.getConnection()) {
+            Long id = byDerivKey(c, p.exchange, p.symbol, p.expiry, p.strike, p.optionType);
+            if (id != null) {
+                log.info(GREEN + "✅ Found derivative instrument: " + RESET + id);
+                return id;
+            }
+
+            id = bySymbol(c, p.exchange, p.symbol);
+            if (id != null) {
+                log.info(GREEN + "✅ Found underlying instrument: " + RESET + id);
+                return id;
+            }
+
+            long newId = insertStub(c, p.exchange, p.symbol, p.instrumentType, null);
+            log.warn(YELLOW + "⚠️ No match found. Inserted new stub instrument with ID=" + newId + RESET);
+            return newId;
+
+        } catch (SQLException e) {
+            log.error(RED + "❌ Error resolving Position instrument: " + e.getMessage() + RESET, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Long byIsin(Connection c, String isin) throws SQLException {
+        if (isin == null) return null;
+        try (PreparedStatement ps = c.prepareStatement("SELECT * FROM instrument WHERE isin=?")) {
+            ps.setString(1, isin);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
+
+    private Long bySymbol(Connection c, String exch, String sym) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT * FROM instrument i JOIN instrument_identifier ii ON ii.instrument_id=i.id " +
+                        "WHERE ii.exchange_code=? AND ii.symbol=?")) {
+            ps.setString(1, exch);
+            ps.setString(2, sym);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
+
+    private Long byDerivKey(Connection c, String exch, String sym, String expiry,
+                            java.math.BigDecimal strike, String opt) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT * FROM instrument WHERE exchange_code=? AND tradingsymbol=? AND expiry_date=? AND strike_price=? AND option_type=?")) {
+            ps.setString(1, exch);
+            ps.setString(2, sym);
+            ps.setString(3, expiry);
+            ps.setBigDecimal(4, strike == null ? java.math.BigDecimal.ZERO : strike);
+            ps.setString(5, opt);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
+
+    private long insertStub(Connection c, String exch, String sym, String type, String isin) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "INSERT INTO instrument(instrument_type,exchange_code,tradingsymbol,isin,created_at,updated_at) " +
+                        "VALUES(?,?,?,?,NOW(),NOW())", Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, type);
+            ps.setString(2, exch);
+            ps.setString(3, sym);
+            ps.setString(4, isin);
+            ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+}
+===== pm/services/impl/PortfolioSyncServiceImpl.java =====
+package com.pm.services.impl;
+
+import com.GenericeConstants;
+import com.pm.connectors.BrokerConnector;
+import com.pm.dao.DataSourcePoolProviderService;
+import com.pm.dao.PortfolioDao;
+import com.pm.dto.*;
+import com.pm.services.PortfolioSyncService;
+import com.pm.config.PortfolioSyncConfig;
+import org.osgi.service.component.annotations.*;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.util.List;
+import java.util.concurrent.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Component(service = PortfolioSyncService.class, immediate = true)
+public class PortfolioSyncServiceImpl implements PortfolioSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(PortfolioSyncServiceImpl.class);
+
+    // ANSI Color Codes
+    private static final String RESET = "\u001B[0m";
+    private static final String RED = "\u001B[31m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN = "\u001B[36m";
+
+    private DataSource dataSource;
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    @Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC)
+    private volatile List<BrokerConnector> connectors;
+
+    @Reference
+    private PortfolioDao dao;
+
+    private volatile PortfolioSyncConfig cfg;
+
+    @Activate @Modified
+    protected void activate(PortfolioSyncConfig cfg) {
+        this.cfg = cfg;
+        log.info(CYAN + "PortfolioSyncService activated with parallelism={} enabled={}" + RESET,
+                cfg.parallelism(), cfg.enabled());
+    }
+
+    @Override
+    public void syncAllBrokersOnce() {
+        if (!cfg.enabled()) {
+            log.info(YELLOW + "Portfolio sync disabled" + RESET);
+            return;
+        }
+        dataSource = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        if (dataSource == null) {
+            log.error(RED + "DataSource not found! Cannot perform portfolio sync." + RESET);
+            return;
+        }
+        log.info(CYAN + "Starting portfolio sync with {} connectors..." + RESET, connectors.size());
+
+        ExecutorService pool = Executors.newFixedThreadPool(cfg.parallelism());
+        try {
+            for (BrokerConnector bc : connectors) {
+                List<BrokerAccountRef> accounts = bc.discoverAccounts();
+                log.info(GREEN + "Discovered {} accounts for broker={}" + RESET, accounts.size(), bc.brokerCode());
+                for (BrokerAccountRef acc : accounts) {
+                    pool.submit(() -> syncAccount(bc, acc));
+                }
+            }
+        } finally {
+            pool.shutdown();
+            try {
+                pool.awaitTermination(4, TimeUnit.MINUTES);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void syncAccount(BrokerConnector bc, BrokerAccountRef acc) {
+        try (Connection c = dataSource.getConnection()) {
+            c.setAutoCommit(false);
+            PortfolioSnapshot snap = bc.fetchPortfolio(acc);
+            dao.upsertAccountSnapshot(c, acc, snap);
+            c.commit();
+            log.info(GREEN + "Synced broker={} account={} (UBA:{})" + RESET,
+                    bc.brokerCode(), acc.externalAccountId, acc.userBrokerAccountId);
+        } catch (Exception e) {
+            log.error(RED + "Sync failed for broker={} uba={} : {}" + RESET,
+                    bc.brokerCode(), acc.userBrokerAccountId, e.getMessage(), e);
+        }
+    }
+}
+===== pm/servlet/KiteCallbackServlet.java =====
+package com.pm.servlet;
+
+import com.pm.connectors.kite.KiteAuthService;
+import org.apache.sling.api.SlingHttpServletRequest;
+import org.apache.sling.api.SlingHttpServletResponse;
+import org.apache.sling.api.servlets.SlingAllMethodsServlet;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.servlet.Servlet;
+import java.io.IOException;
+
+@Component(
+        service = Servlet.class,
+        property = {
+                "sling.servlet.paths=/bin/kite/callback",
+                "sling.servlet.methods=GET"
+        }
+)
+public class KiteCallbackServlet extends SlingAllMethodsServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(KiteCallbackServlet.class);
+
+    @Reference
+    private KiteAuthService kiteAuthService;
+
+    @Override
+    protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response) throws IOException {
+        // Extract request_token and account identifiers
+        String requestToken = request.getParameter("request_token");
+        String userId       = request.getParameter("user_id");
+        String brokerName   = request.getParameter("broker_name");
+        String accountNumber= request.getParameter("account_number");
+
+        // Validate parameters
+        if (requestToken == null || userId == null || brokerName == null || accountNumber == null) {
+            response.setStatus(400);
+            response.getWriter().write("Missing required parameters");
+            log.warn("Callback missing parameters: request_token={}, user_id={}, broker_name={}, account_number={}",
+                    requestToken, userId, brokerName, accountNumber);
+            return;
+        }
+
+        log.info("Received request_token={} for user_id={} / broker={} / account={}",
+                requestToken, userId, brokerName, accountNumber);
+
+        // Option 1: Pass apiKey and apiSecret directly (if known here)
+        String apiKey    = request.getParameter("api_key");    // Optional: from request param
+        String apiSecret = request.getParameter("api_secret"); // Optional: from request param
+
+        // Option 2: If apiKey/apiSecret stored in broker_accounts, KiteAuthService can fetch internally
+
+        // Exchange request_token for access_token and store in DB
+        String success = kiteAuthService.getAccessTokenAndStoreToken(
+                requestToken,
+                brokerName,
+                accountNumber,
+                apiKey,        // pass null if KiteAuthService handles fetching from DB
+                apiSecret      // pass null if KiteAuthService handles fetching from DB
+        );
+
+        // Respond
+        response.getWriter().write(success);
+    }
+}
+===== pm/utils/OsgiUtils.java =====
+package com.pm.utils;
+
+import javax.sql.DataSource;
+import org.osgi.framework.ServiceReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+
+public class OsgiUtils {
+
+    private static final Logger log = LoggerFactory.getLogger(OsgiUtils.class);
+
+    // ANSI colors
+    private static final String RESET  = "\u001B[0m";
+    private static final String RED    = "\u001B[31m";
+    private static final String GREEN  = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN   = "\u001B[36m";
+
+    /**
+     * Print all DataSource service properties with colored logging
+     */
+    public static void printDataSourceProps(ServiceReference<DataSource> ref) {
+        Arrays.stream(ref.getPropertyKeys()).forEach(key -> {
+            Object val = ref.getProperty(key);
+            log.info("{}[DS PROP]{} {}{}{} = {}{}{}",
+                    CYAN, RESET, YELLOW, key, RESET, GREEN, val, RESET);
+        });
+    }
+
+    /**
+     * Check if a DataSource has a matching datasource.name property
+     */
+    public static boolean hasDataSourceName(ServiceReference<DataSource> ref, String targetName) {
+        boolean result = Arrays.stream(ref.getPropertyKeys())
+                .filter(key -> targetName.equals(key))
+                .map(ref::getProperty)
+                .anyMatch(val -> targetName.equals(val));
+        if (result) {
+            log.info("{}[MATCH]{} Found datasource.name={}{}", GREEN, RESET, targetName, RESET);
+        } else {
+            log.debug("{}[NO MATCH]{} Expected={}",
+                    RED, RESET, targetName );
+        }
+
+        return result;
+    }
+}
+===== pm/utils/Retry.java =====
+package com.pm.utils;
+
+
+import java.util.function.Supplier;
+
+public class Retry {
+    public static <T> T exec(int attempts, long backoffMs, Supplier<T> call) {
+        RuntimeException last = null;
+        for (int i=0;i<attempts;i++){
+            try { return call.get(); } catch (RuntimeException e) {
+                last = e;
+                try { Thread.sleep(backoffMs * (1L<<i)); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            }
+        }
+        throw last;
+    }
+}

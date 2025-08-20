@@ -1,0 +1,6 @@
+{
+  "service.ranking:Integer":0,
+  "user.mapping":[
+    "com.aem.ai.scanner.core:read-write-service-user=read-write-service-user"
+  ]
+}

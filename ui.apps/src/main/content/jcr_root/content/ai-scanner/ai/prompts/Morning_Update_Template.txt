@@ -1,0 +1,66 @@
+
+NIFTY:
+{Insert Nifty summary – mention previous day’s closing trend, range, key
+supports/resistances, breakout/sideways outlook. Example: “Nifty ended
+flat in a narrow range, holding above {NIFTY_SUPPORT}. A breakout above
+{NIFTY_RESISTANCE} may trigger a fresh rally; below this, trade may
+remain sideways.”}
+
+BANK NIFTY:
+{Insert Bank Nifty summary – mention EMA levels, consolidation/breakout,
+upside/downside risks. Example: “Bank Nifty is holding above its
+{EMA_LEVEL} support at {BANK_SUPPORT}. A close above {BANK_RESISTANCE}
+could trigger short covering, while a break below {BANK_SUPPORT} may
+shift momentum to sellers.”}
+
+------------------------------------------------------------------------
+
+Key Levels
+
+📌 Nifty 50
+- Support Level : {NIFTY_SUPPORT}
+- Resistance Level : {NIFTY_RESISTANCE}
+
+📌 Bank Nifty
+- Support Level : {BANK_SUPPORT}
+- Resistance Level : {BANK_RESISTANCE}
+
+------------------------------------------------------------------------
+
+Stocks in News
+
+-   {Stock 1}: {News headline/announcement}
+-   {Stock 2}: {News headline/announcement}
+-   {Stock 3}: {News headline/announcement}
+-   {Stock 4}: {News headline/announcement}
+-   {Stock 5}: {News headline/announcement}
+    (Add more as required)
+
+------------------------------------------------------------------------
+
+Quick Takeaways (Global + Domestic News)
+
+-   {News Item 1}
+-   {News Item 2}
+-   {News Item 3}
+-   {News Item 4}
+-   {News Item 5}
+    (Add 10–15 crisp bullets depending on importance)
+
+------------------------------------------------------------------------
+
+F&O Stocks in Ban
+
+-   {Stock A}
+-   {Stock B}
+-   {Stock C}
+    (List daily updated ban stocks)
+
+------------------------------------------------------------------------
+
+⚡ Instruction for AI Use:
+When you paste live market data/news into this template, ensure:
+- Replace placeholders {} with real values.
+- Keep language concise, neutral, and market-style (avoid exaggeration).
+- Use Nifty & Bank Nifty technical levels, stock news headlines, and
+global quick takeaways.

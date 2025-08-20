@@ -2,7 +2,9 @@ package com.aem.ai.scanner.scheduler;
 
 import com.aem.ai.scanner.dao.MySQLService;
 import com.aem.ai.scanner.services.GeminiService;
+import com.aem.ai.scanner.services.TelegramService;
 import com.aem.ai.scanner.services.impl.FinanceNewsService;
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Modified;
@@ -38,7 +40,7 @@ public class MarketNewsScheduler implements Runnable {
 
         @AttributeDefinition(name = "Cron expression",
                 description = "CRON format, default: every 5 minutes")
-        String scheduler_expression() default "0 0/5 * * * ?";
+        String scheduler_expression() default "0 9,14,18 * * * ?";
 
 
 
@@ -52,6 +54,9 @@ public class MarketNewsScheduler implements Runnable {
 
     @Reference
     private FinanceNewsService financeNewsService;
+
+    @Reference
+    private TelegramService telegramService;
 
     private Config config;
 
@@ -79,6 +84,9 @@ public class MarketNewsScheduler implements Runnable {
         try {
             String todayNewsUpdates = geminiService.todayNewsUpdates();
             LOGGER.info("📈 Gemini todayNewsUpdates: {}", todayNewsUpdates);
+            if (StringUtils.isNotEmpty(todayNewsUpdates)){
+                telegramService.sendMessageDailyNews(todayNewsUpdates);
+            }
 
         } catch (Exception e) {
             LOGGER.error(e.getMessage(),e);

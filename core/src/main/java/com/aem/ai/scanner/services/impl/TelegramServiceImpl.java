@@ -33,6 +33,27 @@ public class TelegramServiceImpl implements TelegramService {
             sendToConfig(cfg, text);
         }
     }
+    /** Send message to ALL telegram accounts */
+    public void sendMessageDailyNews(String text) {
+        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyNewsConfigs();
+        for (TelegramConfig cfg : configs) {
+            sendToConfig(cfg, text);
+        }
+    }
+    /** Send message to ALL telegram accounts */
+    public void sendMessageDailyStocksAlerts(String text) {
+        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyAlertsConfigs();
+        for (TelegramConfig cfg : configs) {
+            sendToConfig(cfg, text);
+        }
+    }
+    /** Send message to ALL telegram accounts */
+    public void sendMessageDailyCryptoAlerts(String text) {
+        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyCryptoAlertsConfigs();
+        for (TelegramConfig cfg : configs) {
+            sendToConfig(cfg, text);
+        }
+    }
 
     /** Send only to MONITOR purpose accounts */
     public void sendMonitorLog(String level, String text) {
@@ -50,6 +71,8 @@ public class TelegramServiceImpl implements TelegramService {
             String apiUrl = "https://api.telegram.org/bot" + cfg.getBotToken() + "/sendMessage";
             String url = apiUrl + "?chat_id=" + URLEncoder.encode(String.valueOf(cfg.getBotChatId()), StandardCharsets.UTF_8)
                     + "&text=" + URLEncoder.encode(text, StandardCharsets.UTF_8);
+            log.info( "Sending to {} ({}) with text: {}", cfg.getChatTitle(), cfg.getPurpose(), text);
+            log.info(url );
             String res = http.get(url);
             log.info("Sent to {} ({}) response={}", cfg.getChatTitle(), cfg.getPurpose(), res);
         } catch (Exception e) {

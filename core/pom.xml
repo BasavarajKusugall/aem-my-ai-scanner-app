@@ -198,6 +198,14 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
@@ -240,6 +248,20 @@
             <version>1.0.4</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <artifactId>commons-codec</artifactId>
+            <version>1.16.0</version>
+            <groupId>commons-codec</groupId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.zerodhatech.kiteconnect/kiteconnect -->
+        <dependency>
+            <groupId>com.zerodhatech.kiteconnect</groupId>
+            <artifactId>kiteconnect</artifactId>
+            <version>3.5.1</version>
+            <scope>provided</scope>
+        </dependency>
+
     </dependencies>
 
     <!--

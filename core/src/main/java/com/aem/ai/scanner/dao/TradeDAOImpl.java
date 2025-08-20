@@ -1,7 +1,9 @@
 package com.aem.ai.scanner.dao;
 
 
+import com.GenericeConstants;
 import com.aem.ai.scanner.model.*;
+import com.pm.dao.DataSourcePoolProviderService;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -23,9 +25,14 @@ public class TradeDAOImpl implements TradeDAO {
 
     private static final Logger logger = LoggerFactory.getLogger(TradeDAOImpl.class);
     public static final String NSE_EQ = "NSE_EQ|";
-    @Reference
-    private DataSource dataSource;
 
+
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    private DataSource getDataSource() {
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_UPSTOX_TRADE_BOOK);
+    }
     @Activate
     protected void activate(TradeDAOConfig config) {
         logger.info("TradeDAO activated with DataSource: {}", config.datasourceName());
@@ -33,7 +40,14 @@ public class TradeDAOImpl implements TradeDAO {
 
 
     private Connection conn() throws SQLException {
-        return dataSource.getConnection();
+        DataSource dataSource = getDataSource();
+        Connection connection = dataSource.getConnection();
+        if (connection != null){
+            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            connection.setAutoCommit(true); // ensure commit per statement
+            return connection;
+        }
+        return null;
     }
 
     // -------------------- WATCHLIST --------------------
@@ -198,12 +212,22 @@ public class TradeDAOImpl implements TradeDAO {
     public List<TelegramConfig> fetchTelegramMonitorConfigs() {
         return fetchTelegramConfigs("MONITOR");
     }
+    public List<TelegramConfig> fetchTelegramDailyNewsConfigs() {
+        return fetchTelegramConfigs("NEWS");
+    }
+    public List<TelegramConfig> fetchTelegramDailyAlertsConfigs() {
+        return fetchTelegramConfigs("STOCKS_ALERTS");
+    }
+    public List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs() {
+        return fetchTelegramConfigs("CRYPTO_ALERTS");
+    }
 
     private List<TelegramConfig> fetchTelegramConfigs(String purposeFilter) {
         List<TelegramConfig> configs = new ArrayList<>();
-        String sql = "SELECT bot_chat_id, chat_type, chat_title, bot_name, bot_token, bot_user_id, purpose, is_group_enabled " +
-                "FROM telegram_bot_config WHERE is_active = 1";
-        if ("MONITOR".equals(purposeFilter)) sql += " AND purpose='MONITOR'";
+        String sql = "SELECT * FROM telegram_bot_config WHERE is_active = 1";
+        if (StringUtils.isNotEmpty(purposeFilter)){
+            sql += " AND purpose='" + purposeFilter + "'";
+        }
 
         try (Connection conn = conn();
              PreparedStatement ps = conn.prepareStatement(sql);

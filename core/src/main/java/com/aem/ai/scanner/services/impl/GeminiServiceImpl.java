@@ -64,10 +64,10 @@ public class GeminiServiceImpl implements GeminiService {
         String gemini_endpoint() default "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
         @AttributeDefinition(name = "Daily News Prompt File Path", description = "Daily News Path to prompt.txt file in repository or file system")
-        String gemini_daily_news_updates_prompt_path() default "/content/configs/Morning_Update_Template.txt";
+        String gemini_daily_news_updates_prompt_path() default "/content/ai-scanner/ai/prompts/Morning_Update_Template.txt";
 
         @AttributeDefinition(name = "Fundament Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
-        String gemini_fundamental_analysis_prompt_path() default "/content/configs/Morning_Update_Template.txt";
+        String gemini_fundamental_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/Morning_Update_Template.txt";
     }
 
     @Activate

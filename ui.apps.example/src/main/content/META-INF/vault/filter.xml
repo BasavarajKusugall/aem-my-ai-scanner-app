@@ -30,6 +30,7 @@
     -->
     <filter root="/content/ai-scanner"/>
     <filter root="/etc/map/http/localhost_any"/>
+    <filter root="/content/ai-scanner/ai/prompts"/>
     <!--
         Need to exclude the Install folder otherwise the Bundle will be undeployed
         as it is in the '/apps/ai-scanner/install' folder (see the 'all'

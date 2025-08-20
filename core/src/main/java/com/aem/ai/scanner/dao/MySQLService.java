@@ -1,6 +1,8 @@
 package com.aem.ai.scanner.dao;
 
 
+import com.GenericeConstants;
+import com.pm.dao.DataSourcePoolProviderService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
@@ -13,9 +15,16 @@ import java.sql.ResultSet;
 public class MySQLService {
 
     @Reference
-    private DataSource dataSource;
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+
+    private DataSource getDataSource() {
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_UPSTOX_TRADE_BOOK);
+    }
+
 
     public void testQuery() {
+        DataSource dataSource = getDataSource();
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement("SELECT bot_chat_id, chat_type, chat_title, bot_name, bot_token, bot_user_id, purpose, is_group_enabled \" +\n" +
                      "                \"FROM telegram_bot_config WHERE is_active = 1");

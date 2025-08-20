@@ -1,0 +1,7 @@
+{
+  "scripts": [
+    "create service user read-write-service-user with path /home/users/system/",
+    "set ACL for read-write-service-user\r\n allow jcr:all on /, /home\r\nend",
+    "add read-write-service-user to group administrators"
+  ]
+}

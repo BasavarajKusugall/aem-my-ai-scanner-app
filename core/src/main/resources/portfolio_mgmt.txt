@@ -1,0 +1,1086 @@
+===== sql/portfolio_mgmt_app_user.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `app_user`
+--
+
+DROP TABLE IF EXISTS `app_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `app_user` (
+  `user_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `external_ref` varchar(128) DEFAULT NULL,
+  `email` varchar(190) NOT NULL,
+  `full_name` varchar(190) DEFAULT NULL,
+  `phone` varchar(40) DEFAULT NULL,
+  `status` enum('ACTIVE','SUSPENDED') NOT NULL DEFAULT 'ACTIVE',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `ux_user_email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `app_user`
+--
+
+LOCK TABLES `app_user` WRITE;
+/*!40000 ALTER TABLE `app_user` DISABLE KEYS */;
+INSERT INTO `app_user` VALUES (1,'CRM-12345','basu.sk7@gmail.com','Basavaraj Shankrappa Kusugall','+91-9483003687','ACTIVE','2025-08-19 16:05:25'),(2,'CRM-1','basavaraj.kusugall@gmail.com','Basavaraj Shankrappa Kusugall','+91-9483003687','ACTIVE','2025-08-20 02:52:16');
+/*!40000 ALTER TABLE `app_user` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:21:59
+===== sql/portfolio_mgmt_broker.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `broker`
+--
+
+DROP TABLE IF EXISTS `broker`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `broker` (
+  `broker_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(64) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `api_base_url` varchar(512) DEFAULT NULL,
+  `status` enum('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`broker_id`),
+  UNIQUE KEY `ux_broker_code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `broker`
+--
+
+LOCK TABLES `broker` WRITE;
+/*!40000 ALTER TABLE `broker` DISABLE KEYS */;
+INSERT INTO `broker` VALUES (1,'UPSTOX','Upstox Securities','https://api.upstox.com','ACTIVE','2025-08-19 16:05:25'),(2,'ZERODHA','Zerodha Kite','https://api.kite.trade','ACTIVE','2025-08-19 17:12:55');
+/*!40000 ALTER TABLE `broker` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:18:43
+===== sql/portfolio_mgmt_broker_token.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `broker_token`
+--
+
+DROP TABLE IF EXISTS `broker_token`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `broker_token` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `broker_account_id` bigint unsigned NOT NULL,
+  `broker_name` varchar(50) NOT NULL,
+  `access_token` varchar(512) DEFAULT NULL,
+  `refresh_token` varchar(512) DEFAULT NULL,
+  `token_expiry` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_broker` (`user_id`,`broker_account_id`,`broker_name`),
+  KEY `fk_broker_token_account` (`broker_account_id`),
+  CONSTRAINT `fk_broker_token_account` FOREIGN KEY (`broker_account_id`) REFERENCES `user_broker_account` (`account_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_broker_token_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `broker_token`
+--
+
+LOCK TABLES `broker_token` WRITE;
+/*!40000 ALTER TABLE `broker_token` DISABLE KEYS */;
+INSERT INTO `broker_token` VALUES (1,1,1,'UPSTOX','eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI0NUNBWTQiLCJqdGkiOiI2OGE0YTBhMWM1MDFlYjUyMzRhNDE2YjMiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6dHJ1ZSwiaWF0IjoxNzU1NjE5NDg5LCJpc3MiOiJ1ZGFwaS1nYXRld2F5LXNlcnZpY2UiLCJleHAiOjE3NTU2NDA4MDB9.n2tcMmK7TGSmEcpPIvMQL2ReTJcHk6rxUy-sQCYWdDk','eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI0NUNBWTQiLCJqdGkiOiI2OGE0YTBhMWM1MDFlYjUyMzRhNDE2YjMiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6dHJ1ZSwiaWF0IjoxNzU1NjE5NDg5LCJpc3MiOiJ1ZGFwaS1nYXRld2F5LXNlcnZpY2UiLCJleHAiOjE3NTU2NDA4MDB9.n2tcMmK7TGSmEcpPIvMQL2ReTJcHk6rxUy-sQCYWdDk','2025-08-20 17:08:20','2025-08-19 17:08:20','2025-08-19 17:08:20'),(2,1,2,'ZERODHA','r5P6scK376DbYqdgNml62Xc03V9r6i2o','3dhIq4leh9HtxOVcui7jVYhktxM3eVqD','2025-08-20 17:15:36','2025-08-19 17:15:36','2025-08-20 12:44:47');
+/*!40000 ALTER TABLE `broker_token` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:21:59
+===== sql/portfolio_mgmt_cash_ledger.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `cash_ledger`
+--
+
+DROP TABLE IF EXISTS `cash_ledger`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `cash_ledger` (
+  `cash_ledger_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `account_id` bigint unsigned NOT NULL,
+  `txn_time` datetime NOT NULL,
+  `currency` char(3) NOT NULL,
+  `amount` decimal(20,8) NOT NULL,
+  `balance_after` decimal(20,8) DEFAULT NULL,
+  `txn_type` enum('DEPOSIT','WITHDRAWAL','DIVIDEND','INTEREST','FEES','TAX','ADJUSTMENT','PNL_SETTLEMENT') NOT NULL,
+  `reference` varchar(128) DEFAULT NULL,
+  `remarks` varchar(512) DEFAULT NULL,
+  PRIMARY KEY (`cash_ledger_id`),
+  KEY `ix_cash_acct_time` (`account_id`,`txn_time`),
+  CONSTRAINT `fk_cash_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `cash_ledger`
+--
+
+LOCK TABLES `cash_ledger` WRITE;
+/*!40000 ALTER TABLE `cash_ledger` DISABLE KEYS */;
+/*!40000 ALTER TABLE `cash_ledger` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:01
+===== sql/portfolio_mgmt_corporate_action.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `corporate_action`
+--
+
+DROP TABLE IF EXISTS `corporate_action`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `corporate_action` (
+  `corporate_action_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `instrument_id` bigint unsigned NOT NULL,
+  `action_type` enum('DIVIDEND','SPLIT','BONUS','RIGHTS','MERGER','DEMERGER') NOT NULL,
+  `ex_date` date NOT NULL,
+  `record_date` date DEFAULT NULL,
+  `ratio_numerator` decimal(20,8) DEFAULT NULL,
+  `ratio_denominator` decimal(20,8) DEFAULT NULL,
+  `cash_component` decimal(20,8) DEFAULT NULL,
+  `notes` varchar(512) DEFAULT NULL,
+  PRIMARY KEY (`corporate_action_id`),
+  KEY `ix_ca_instr_exdate` (`instrument_id`,`ex_date`),
+  CONSTRAINT `fk_ca_instr` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `corporate_action`
+--
+
+LOCK TABLES `corporate_action` WRITE;
+/*!40000 ALTER TABLE `corporate_action` DISABLE KEYS */;
+/*!40000 ALTER TABLE `corporate_action` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:01
+===== sql/portfolio_mgmt_exchange.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `exchange`
+--
+
+DROP TABLE IF EXISTS `exchange`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `exchange` (
+  `exchange_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(16) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `country` varchar(64) DEFAULT NULL,
+  `timezone` varchar(64) DEFAULT NULL,
+  PRIMARY KEY (`exchange_id`),
+  UNIQUE KEY `ux_exchange_code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `exchange`
+--
+
+LOCK TABLES `exchange` WRITE;
+/*!40000 ALTER TABLE `exchange` DISABLE KEYS */;
+INSERT INTO `exchange` VALUES (1,'NSE','National Stock Exchange of India','India','Asia/Kolkata');
+/*!40000 ALTER TABLE `exchange` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:00
+===== sql/portfolio_mgmt_execution.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `execution`
+--
+
+DROP TABLE IF EXISTS `execution`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `execution` (
+  `execution_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `order_id` bigint unsigned NOT NULL,
+  `account_id` bigint unsigned NOT NULL,
+  `instrument_id` bigint unsigned NOT NULL,
+  `side` enum('BUY','SELL') NOT NULL,
+  `exec_qty` decimal(20,8) NOT NULL,
+  `exec_price` decimal(20,8) NOT NULL,
+  `exec_fees` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `exec_taxes` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `exec_time` datetime NOT NULL,
+  `broker_trade_id` varchar(128) DEFAULT NULL,
+  PRIMARY KEY (`execution_id`),
+  KEY `ix_exec_order` (`order_id`),
+  KEY `ix_exec_acct_time` (`account_id`,`exec_time`),
+  KEY `ix_exec_instr` (`instrument_id`),
+  CONSTRAINT `fk_exec_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`),
+  CONSTRAINT `fk_exec_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`),
+  CONSTRAINT `fk_exec_order` FOREIGN KEY (`order_id`) REFERENCES `order` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `execution`
+--
+
+LOCK TABLES `execution` WRITE;
+/*!40000 ALTER TABLE `execution` DISABLE KEYS */;
+/*!40000 ALTER TABLE `execution` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:18:43
+===== sql/portfolio_mgmt_holding.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `holding`
+--
+
+DROP TABLE IF EXISTS `holding`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `holding` (
+  `holding_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `account_id` bigint unsigned NOT NULL,
+  `instrument_id` bigint unsigned NOT NULL,
+  `qty` decimal(20,8) NOT NULL,
+  `avg_cost` decimal(20,8) NOT NULL,
+  `last_updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `user_broker_account_id` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`holding_id`),
+  UNIQUE KEY `ux_holding` (`account_id`,`instrument_id`),
+  KEY `ix_hold_instr` (`instrument_id`),
+  CONSTRAINT `fk_holding_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`),
+  CONSTRAINT `fk_holding_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `holding`
+--
+
+LOCK TABLES `holding` WRITE;
+/*!40000 ALTER TABLE `holding` DISABLE KEYS */;
+/*!40000 ALTER TABLE `holding` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:00
+===== sql/portfolio_mgmt_instrument_identifier.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `instrument_identifier`
+--
+
+DROP TABLE IF EXISTS `instrument_identifier`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `instrument_identifier` (
+  `instrument_identifier_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `instrument_id` bigint unsigned NOT NULL,
+  `id_type` varchar(32) NOT NULL,
+  `id_value` varchar(128) NOT NULL,
+  PRIMARY KEY (`instrument_identifier_id`),
+  UNIQUE KEY `ux_instr_id` (`instrument_id`,`id_type`),
+  KEY `ix_identifier_lookup` (`id_type`,`id_value`),
+  CONSTRAINT `fk_iid_instr` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `instrument_identifier`
+--
+
+LOCK TABLES `instrument_identifier` WRITE;
+/*!40000 ALTER TABLE `instrument_identifier` DISABLE KEYS */;
+/*!40000 ALTER TABLE `instrument_identifier` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:18:43
+===== sql/portfolio_mgmt_order.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `order`
+--
+
+DROP TABLE IF EXISTS `order`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `order` (
+  `order_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `account_id` bigint unsigned NOT NULL,
+  `instrument_id` bigint unsigned NOT NULL,
+  `side` enum('BUY','SELL') NOT NULL,
+  `order_type` enum('MKT','LMT','SL','SLM') NOT NULL,
+  `qty` decimal(20,8) NOT NULL,
+  `price` decimal(20,8) DEFAULT NULL,
+  `status` enum('NEW','PARTIALLY_FILLED','FILLED','CANCELLED','REJECTED') NOT NULL DEFAULT 'NEW',
+  `broker_order_id` varchar(128) DEFAULT NULL,
+  `placed_at` datetime NOT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `time_in_force` enum('DAY','IOC','GTC') DEFAULT 'DAY',
+  `remarks` varchar(512) DEFAULT NULL,
+  PRIMARY KEY (`order_id`),
+  KEY `ix_order_acct_time` (`account_id`,`placed_at`),
+  KEY `ix_order_instr` (`instrument_id`),
+  CONSTRAINT `fk_order_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`),
+  CONSTRAINT `fk_order_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `order`
+--
+
+LOCK TABLES `order` WRITE;
+/*!40000 ALTER TABLE `order` DISABLE KEYS */;
+/*!40000 ALTER TABLE `order` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:00
+===== sql/portfolio_mgmt_pnl_daily_account.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `pnl_daily_account`
+--
+
+DROP TABLE IF EXISTS `pnl_daily_account`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pnl_daily_account` (
+  `pnl_daily_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `as_of_date` date NOT NULL,
+  `account_id` bigint unsigned NOT NULL,
+  `total_equity_mv` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `total_deriv_mv` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `cash_balance` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `realized_pnl` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `unrealized_pnl` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `fees_taxes` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `net_liquidation` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`pnl_daily_id`),
+  UNIQUE KEY `ux_pnl_acc_date` (`account_id`,`as_of_date`),
+  KEY `ix_pnl_date` (`as_of_date`),
+  CONSTRAINT `fk_pnl_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `pnl_daily_account`
+--
+
+LOCK TABLES `pnl_daily_account` WRITE;
+/*!40000 ALTER TABLE `pnl_daily_account` DISABLE KEYS */;
+/*!40000 ALTER TABLE `pnl_daily_account` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:01
+===== sql/portfolio_mgmt_pnl_daily_user.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `pnl_daily_user`
+--
+
+DROP TABLE IF EXISTS `pnl_daily_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pnl_daily_user` (
+  `pnl_user_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `as_of_date` date NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `total_equity_mv` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `total_deriv_mv` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `cash_balance` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `realized_pnl` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `unrealized_pnl` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `fees_taxes` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `net_liquidation` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`pnl_user_id`),
+  UNIQUE KEY `ux_pnl_user_date` (`user_id`,`as_of_date`),
+  KEY `ix_pnl_user_date` (`as_of_date`),
+  CONSTRAINT `fk_pnl_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `pnl_daily_user`
+--
+
+LOCK TABLES `pnl_daily_user` WRITE;
+/*!40000 ALTER TABLE `pnl_daily_user` DISABLE KEYS */;
+/*!40000 ALTER TABLE `pnl_daily_user` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:00
+===== sql/portfolio_mgmt_position.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `position`
+--
+
+DROP TABLE IF EXISTS `position`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `position` (
+  `position_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `account_id` bigint unsigned NOT NULL,
+  `instrument_id` bigint unsigned NOT NULL,
+  `product_type` enum('INTRADAY','DELIVERY','FUT','OPT','FX','COMMODITY') NOT NULL,
+  `direction` enum('LONG','SHORT') NOT NULL,
+  `open_qty` decimal(20,8) NOT NULL,
+  `avg_entry_price` decimal(20,8) NOT NULL,
+  `realized_pnl` decimal(20,8) NOT NULL DEFAULT '0.00000000',
+  `opened_at` datetime NOT NULL,
+  `last_updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `status` enum('OPEN','CLOSED') NOT NULL DEFAULT 'OPEN',
+  PRIMARY KEY (`position_id`),
+  UNIQUE KEY `ux_position` (`account_id`,`instrument_id`,`product_type`,`status`),
+  KEY `ix_pos_instr` (`instrument_id`),
+  CONSTRAINT `fk_position_account` FOREIGN KEY (`account_id`) REFERENCES `user_broker_account` (`account_id`),
+  CONSTRAINT `fk_position_instrument` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `position`
+--
+
+LOCK TABLES `position` WRITE;
+/*!40000 ALTER TABLE `position` DISABLE KEYS */;
+/*!40000 ALTER TABLE `position` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:00
+===== sql/portfolio_mgmt_price_eod.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `price_eod`
+--
+
+DROP TABLE IF EXISTS `price_eod`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `price_eod` (
+  `price_eod_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `instrument_id` bigint unsigned NOT NULL,
+  `price_date` date NOT NULL,
+  `open_price` decimal(20,8) NOT NULL,
+  `high_price` decimal(20,8) NOT NULL,
+  `low_price` decimal(20,8) NOT NULL,
+  `close_price` decimal(20,8) NOT NULL,
+  `volume` decimal(20,8) DEFAULT NULL,
+  PRIMARY KEY (`price_eod_id`),
+  UNIQUE KEY `ux_eod` (`instrument_id`,`price_date`),
+  KEY `ix_eod_date` (`price_date`),
+  CONSTRAINT `fk_eod_instr` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `price_eod`
+--
+
+LOCK TABLES `price_eod` WRITE;
+/*!40000 ALTER TABLE `price_eod` DISABLE KEYS */;
+/*!40000 ALTER TABLE `price_eod` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:01
+===== sql/portfolio_mgmt_price_last.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `price_last`
+--
+
+DROP TABLE IF EXISTS `price_last`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `price_last` (
+  `instrument_id` bigint unsigned NOT NULL,
+  `last_price` decimal(20,8) NOT NULL,
+  `last_time` datetime NOT NULL,
+  PRIMARY KEY (`instrument_id`),
+  CONSTRAINT `fk_last_instr` FOREIGN KEY (`instrument_id`) REFERENCES `instrument` (`instrument_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `price_last`
+--
+
+LOCK TABLES `price_last` WRITE;
+/*!40000 ALTER TABLE `price_last` DISABLE KEYS */;
+/*!40000 ALTER TABLE `price_last` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:18:42
+===== sql/portfolio_mgmt_routines.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Temporary view structure for view `v_account_holdings_snapshot`
+--
+
+DROP TABLE IF EXISTS `v_account_holdings_snapshot`;
+/*!50001 DROP VIEW IF EXISTS `v_account_holdings_snapshot`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `v_account_holdings_snapshot` AS SELECT 
+ 1 AS `account_id`,
+ 1 AS `instrument_id`,
+ 1 AS `symbol`,
+ 1 AS `instrument_type`,
+ 1 AS `qty`,
+ 1 AS `avg_cost`,
+ 1 AS `last_price`,
+ 1 AS `cost_value`,
+ 1 AS `market_value`,
+ 1 AS `unrealized_pnl`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary view structure for view `v_account_positions_snapshot`
+--
+
+DROP TABLE IF EXISTS `v_account_positions_snapshot`;
+/*!50001 DROP VIEW IF EXISTS `v_account_positions_snapshot`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `v_account_positions_snapshot` AS SELECT 
+ 1 AS `account_id`,
+ 1 AS `instrument_id`,
+ 1 AS `symbol`,
+ 1 AS `instrument_type`,
+ 1 AS `product_type`,
+ 1 AS `direction`,
+ 1 AS `open_qty`,
+ 1 AS `avg_entry_price`,
+ 1 AS `last_price`,
+ 1 AS `unrealized_pnl`,
+ 1 AS `realized_pnl`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Final view structure for view `v_account_holdings_snapshot`
+--
+
+/*!50001 DROP VIEW IF EXISTS `v_account_holdings_snapshot`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `v_account_holdings_snapshot` AS select `h`.`account_id` AS `account_id`,`h`.`instrument_id` AS `instrument_id`,`i`.`symbol` AS `symbol`,`i`.`instrument_type` AS `instrument_type`,`h`.`qty` AS `qty`,`h`.`avg_cost` AS `avg_cost`,`pl`.`last_price` AS `last_price`,(`h`.`qty` * `h`.`avg_cost`) AS `cost_value`,(`h`.`qty` * `pl`.`last_price`) AS `market_value`,((`pl`.`last_price` - `h`.`avg_cost`) * `h`.`qty`) AS `unrealized_pnl` from ((`holding` `h` join `instrument` `i` on((`i`.`instrument_id` = `h`.`instrument_id`))) left join `price_last` `pl` on((`pl`.`instrument_id` = `h`.`instrument_id`))) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_account_positions_snapshot`
+--
+
+/*!50001 DROP VIEW IF EXISTS `v_account_positions_snapshot`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `v_account_positions_snapshot` AS select `p`.`account_id` AS `account_id`,`p`.`instrument_id` AS `instrument_id`,`i`.`symbol` AS `symbol`,`i`.`instrument_type` AS `instrument_type`,`p`.`product_type` AS `product_type`,`p`.`direction` AS `direction`,`p`.`open_qty` AS `open_qty`,`p`.`avg_entry_price` AS `avg_entry_price`,`pl`.`last_price` AS `last_price`,(case when (`p`.`direction` = 'LONG') then ((`pl`.`last_price` - `p`.`avg_entry_price`) * `p`.`open_qty`) when (`p`.`direction` = 'SHORT') then ((`p`.`avg_entry_price` - `pl`.`last_price`) * `p`.`open_qty`) else 0 end) AS `unrealized_pnl`,`p`.`realized_pnl` AS `realized_pnl` from ((`position` `p` join `instrument` `i` on((`i`.`instrument_id` = `p`.`instrument_id`))) left join `price_last` `pl` on((`pl`.`instrument_id` = `p`.`instrument_id`))) where (`p`.`status` = 'OPEN') */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:22:01
+===== sql/portfolio_mgmt_user_broker_account.sql =====
+-- MySQL dump 10.13  Distrib 8.0.42, for macos15 (arm64)
+--
+-- Host: localhost    Database: portfolio_mgmt
+-- ------------------------------------------------------
+-- Server version	9.3.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `user_broker_account`
+--
+
+DROP TABLE IF EXISTS `user_broker_account`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_broker_account` (
+  `account_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `broker_id` bigint unsigned NOT NULL,
+  `broker_name` varchar(50) NOT NULL,
+  `broker_account_ref` varchar(128) NOT NULL,
+  `account_alias` varchar(128) DEFAULT NULL,
+  `base_currency` char(3) NOT NULL DEFAULT 'INR',
+  `api_key` varchar(100) DEFAULT NULL,
+  `api_secret` varchar(100) DEFAULT NULL,
+  `password` varchar(100) DEFAULT NULL,
+  `pin` varchar(10) DEFAULT NULL,
+  `request_token` varchar(512) DEFAULT NULL,
+  `access_token` varchar(512) DEFAULT NULL,
+  `last_token_refreshed` timestamp NULL DEFAULT NULL,
+  `status` enum('ACTIVE','CLOSED') NOT NULL DEFAULT 'ACTIVE',
+  `opened_at` datetime DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`account_id`),
+  UNIQUE KEY `ux_user_broker_ref` (`user_id`,`broker_id`,`broker_account_ref`),
+  UNIQUE KEY `uq_user_broker_account` (`user_id`,`broker_name`,`broker_account_ref`),
+  KEY `ix_account_user` (`user_id`),
+  KEY `ix_account_broker` (`broker_id`),
+  CONSTRAINT `fk_uba_broker` FOREIGN KEY (`broker_id`) REFERENCES `broker` (`broker_id`),
+  CONSTRAINT `fk_uba_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user_broker_account`
+--
+
+LOCK TABLES `user_broker_account` WRITE;
+/*!40000 ALTER TABLE `user_broker_account` DISABLE KEYS */;
+INSERT INTO `user_broker_account` VALUES (1,1,1,'','45CAY4','Upstox Primary Account','INR',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'ACTIVE','2025-08-19 21:35:25',NULL,'2025-08-19 16:05:25'),(2,1,2,'','JS8737','Zerodha Kite Primary Account','INR','2wf4lhzop39crtwn','8x19vts1b41nma141y4xvdreldl4yi72',NULL,NULL,'R5uKnr0fJ0YYMGfmggWdoCSR7cLWrsYr',NULL,NULL,'ACTIVE','2025-08-19 22:44:54',NULL,'2025-08-19 17:14:54');
+/*!40000 ALTER TABLE `user_broker_account` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-20 20:18:43
