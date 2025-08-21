@@ -1,6 +1,5 @@
 package com.aem.ai.scanner.scheduler;
 
-import com.aem.ai.scanner.dao.MySQLService;
 import com.aem.ai.scanner.services.GeminiService;
 import com.aem.ai.scanner.services.TelegramService;
 import com.aem.ai.scanner.services.impl.FinanceNewsService;
@@ -24,9 +23,6 @@ public class MarketNewsScheduler implements Runnable {
 
     @Reference
     private GeminiService geminiService;
-
-    @Reference
-    private MySQLService mySQLService;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarketNewsScheduler.class);
 
@@ -76,7 +72,6 @@ public class MarketNewsScheduler implements Runnable {
 
     @Override
     public void run() {
-        mySQLService.testQuery();
         if (!config.enable()) {
             LOGGER.debug("⚠️ MarketNewsScheduler is disabled. Skipping run.");
             return;

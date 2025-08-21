@@ -100,8 +100,10 @@ public class KiteConnector implements BrokerConnector {
             CashSummary cash = mapKiteFunds(marginJson);
             log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
 
-
-            return new PortfolioSnapshot(holdings, positions, cash, Instant.now());
+            PortfolioSnapshot portfolioSnapshot = new PortfolioSnapshot(holdings, positions, cash, Instant.now());
+            portfolioSnapshot.setHoldingsJson(holdingsJson);
+            portfolioSnapshot.setPositionsJson(positionsJson);
+            return portfolioSnapshot;
 
         } catch (Exception e) {
             log.error(RED + "❌ Error fetching portfolio: {}" + RESET, e.getMessage(), e);

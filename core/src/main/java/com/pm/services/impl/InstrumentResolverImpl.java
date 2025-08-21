@@ -56,6 +56,9 @@ public class InstrumentResolverImpl implements InstrumentResolver {
 
             long newId = insertStub(c, h.exchange, h.symbol, h.instrumentType, h.isin);
             log.warn(YELLOW + "⚠️ No match found. Inserted new stub instrument with ID=" + newId + RESET);
+            if (newId >0){
+                c.commit();
+            }
             return newId;
 
         } catch (SQLException e) {
@@ -136,8 +139,11 @@ public class InstrumentResolverImpl implements InstrumentResolver {
 
     private long insertStub(Connection c, String exch, String sym, String type, String isin) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO instrument(instrument_type,exchange_code,tradingsymbol,isin,created_at,updated_at) " +
-                        "VALUES(?,?,?,?,NOW(),NOW())", Statement.RETURN_GENERATED_KEYS)) {
+                "INSERT INTO instrument(instrument_type, exchange_code, tradingsymbol, isin, created_at, updated_at)" +
+                        "VALUES (?, ?, ?, ?, NOW(), NOW())" +
+                        "ON DUPLICATE KEY UPDATE" +
+                        "  updated_at = NOW()," +
+                        "  isin = VALUES(isin)", Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, type);
             ps.setString(2, exch);
             ps.setString(3, sym);

@@ -3,6 +3,7 @@ package com.pm.dao.impl;
 import com.pm.dao.PortfolioDao;
 import com.pm.dto.*;
 import com.pm.services.InstrumentResolver;
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,37 @@ public class PortfolioDaoImpl implements PortfolioDao {
     private static final String GREEN  = "\u001B[32m";
     private static final String YELLOW = "\u001B[33m";
     private static final String CYAN   = "\u001B[36m";
+    @Override
+    public void updateUserBrokerAccountJson(Connection c, BrokerAccountRef acc, PortfolioSnapshot snap) {
+        String holdingJson  = snap.getHoldingsJson();
+        String positionJson = snap.getPositionsJson();
+        if (StringUtils.isEmpty(holdingJson) && StringUtils.isEmpty(positionJson)){
+            log.info("{}⚠️ No holdings or positions to update for user_broker_accountId={}{}",
+                    YELLOW, acc.userBrokerAccountId, RESET);
+            return;
+        }
+        try (PreparedStatement ps = c.prepareStatement(
+                "UPDATE user_broker_account " +
+                        "SET portfolio_holding_json = ?, " +
+                        "    portfolio_positions_json = ?, " +
+                        "    updated_at = NOW() " +
+                        "WHERE broker_account_ref = ?")) {
 
+            // Serialize holdings and positions
+            ps.setString(1, holdingJson);
+            ps.setString(2, positionJson);
+            ps.setString(3, acc.brokerAccountRef);
+
+            int rows = ps.executeUpdate();
+            log.info("{}📥 Updated user_broker_account JSON for ubaId={}, rows={}{}",
+                    GREEN, acc.userBrokerAccountId, rows, RESET);
+
+        } catch (Exception e) {
+            log.error("{}❌ Failed to update user_broker_account JSON for ubaId={} : {}{}",
+                    RED, acc.userBrokerAccountId, e.getMessage(), RESET, e);
+            throw new RuntimeException("Failed to update user_broker_account JSON: " + e.getMessage(), e);
+        }
+    }
 
     @Override
     public void upsertAccountSnapshot(Connection c, BrokerAccountRef acc, PortfolioSnapshot snap) {
@@ -47,33 +78,40 @@ public class PortfolioDaoImpl implements PortfolioDao {
                     log.debug("{}➕ Holding upsert queued: accountId={}, instrumentId={}, qty={}, cost={}{}",
                             GREEN, acc.userBrokerAccountId, iid, h.quantity, h.avgCost, RESET);
                 }
+                log.info("Executed query: {}", ps.toString());
                 int[] results = ps.executeBatch();
                 log.info("{}✅ Holdings upserted, batchSize={} rowsUpdated={}{}",
                         GREEN, snap.holdings.size(), results.length, RESET);
             }
 
             // 2) POSITIONS
-            try (PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO position(user_broker_account_id, instrument_id, side, quantity, avg_price, pnl_realized, updated_at) " +
-                            "VALUES(?,?,?,?,?,?,NOW()) " +
-                            "ON DUPLICATE KEY UPDATE side=VALUES(side), quantity=VALUES(quantity), avg_price=VALUES(avg_price), pnl_realized=VALUES(pnl_realized), updated_at=NOW()")) {
+            if (snap.positions != null && !snap.positions.isEmpty()) {
+                log.info("{}⚠️ No positions to upsert for accountId={}{}",
+                        YELLOW, acc.userBrokerAccountId, RESET);
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO position(user_broker_account_id, instrument_id, side, quantity, avg_price, pnl_realized, updated_at) " +
+                                "VALUES(?,?,?,?,?,?,NOW()) " +
+                                "ON DUPLICATE KEY UPDATE side=VALUES(side), quantity=VALUES(quantity), avg_price=VALUES(avg_price), pnl_realized=VALUES(pnl_realized), updated_at=NOW()")) {
 
-                for (PositionItem p : snap.positions) {
-                    long iid = resolver.resolveForPosition(p);
-                    ps.setLong(1, acc.userBrokerAccountId);
-                    ps.setLong(2, iid);
-                    ps.setString(3, p.side);
-                    ps.setBigDecimal(4, p.quantity);
-                    ps.setBigDecimal(5, p.avgPrice);
-                    ps.setBigDecimal(6, p.pnlRealized == null ? java.math.BigDecimal.ZERO : p.pnlRealized);
-                    ps.addBatch();
-                    log.debug("{}➕ Position upsert queued: accountId={}, instrumentId={}, side={}, qty={}, price={}, pnl={}{}",
-                            GREEN, acc.userBrokerAccountId, iid, p.side, p.quantity, p.avgPrice, p.pnlRealized, RESET);
+                    for (PositionItem p : snap.positions) {
+                        long iid = resolver.resolveForPosition(p);
+                        ps.setLong(1, acc.userBrokerAccountId);
+                        ps.setLong(2, iid);
+                        ps.setString(3, p.side);
+                        ps.setBigDecimal(4, p.quantity);
+                        ps.setBigDecimal(5, p.avgPrice);
+                        ps.setBigDecimal(6, p.pnlRealized == null ? java.math.BigDecimal.ZERO : p.pnlRealized);
+                        ps.addBatch();
+                        log.debug("{}➕ Position upsert queued: accountId={}, instrumentId={}, side={}, qty={}, price={}, pnl={}{}",
+                                GREEN, acc.userBrokerAccountId, iid, p.side, p.quantity, p.avgPrice, p.pnlRealized, RESET);
+                    }
+                    log.info("Executed query for positions: {}", ps.toString());
+                    int[] results = ps.executeBatch();
+                    log.info("{}✅ Positions upserted, batchSize={} rowsUpdated={}{}",
+                            GREEN, snap.positions.size(), results.length, RESET);
                 }
-                int[] results = ps.executeBatch();
-                log.info("{}✅ Positions upserted, batchSize={} rowsUpdated={}{}",
-                        GREEN, snap.positions.size(), results.length, RESET);
             }
+
 
             // 3) CASH
             try (PreparedStatement ps = c.prepareStatement(
@@ -82,6 +120,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
                 ps.setTimestamp(2, Timestamp.from(snap.asOf));
                 ps.setBigDecimal(3, snap.cash.available);
                 ps.setBigDecimal(4, snap.cash.used);
+                log.info("Executed query: {}", ps.toString());
                 int rows = ps.executeUpdate();
                 log.info("{}💰 Cash snapshot inserted: accountId={}, asOf={}, available={}, used={}, rows={}{}",
                         GREEN, acc.userBrokerAccountId, snap.asOf, snap.cash.available, snap.cash.used, rows, RESET);

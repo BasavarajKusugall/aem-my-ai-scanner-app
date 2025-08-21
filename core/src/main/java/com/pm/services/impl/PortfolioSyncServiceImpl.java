@@ -84,6 +84,7 @@ public class PortfolioSyncServiceImpl implements PortfolioSyncService {
         try (Connection c = dataSource.getConnection()) {
             c.setAutoCommit(false);
             PortfolioSnapshot snap = bc.fetchPortfolio(acc);
+            dao.updateUserBrokerAccountJson(c, acc, snap);
             dao.upsertAccountSnapshot(c, acc, snap);
             c.commit();
             log.info(GREEN + "Synced broker={} account={} (UBA:{})" + RESET,
