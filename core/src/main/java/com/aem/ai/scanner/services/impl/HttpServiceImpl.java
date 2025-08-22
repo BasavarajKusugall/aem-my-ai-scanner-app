@@ -1,6 +1,5 @@
 package com.aem.ai.scanner.services.impl;
 
-
 import com.aem.ai.scanner.services.HttpService;
 import com.aem.ai.scanner.utils.RetryUtils;
 import org.osgi.service.component.annotations.Activate;
@@ -20,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Lightweight wrapper around Java11 HttpClient with retries.
  */
-@Component(immediate = true,service = HttpService.class)
+@Component(immediate = true, service = HttpService.class)
 public class HttpServiceImpl implements HttpService {
 
     private static final Logger log = LoggerFactory.getLogger(HttpService.class);
@@ -42,18 +41,31 @@ public class HttpServiceImpl implements HttpService {
         return url.replace("|", "%7C");
     }
 
+    /**
+     * Perform a synchronous GET request with retry logic (no extra headers).
+     */
+    @Override
+    public String get(String url) throws Exception {
+        return get(url, null);
+    }
 
     /**
-     * Perform a synchronous GET request with retry logic.
+     * Perform a synchronous GET request with custom headers and retry logic.
      */
-    public String get(String url) throws Exception {
+    public String get(String url, Map<String, String> headers) throws Exception {
         String safeUrl = encodeUnsafePath(url);
-        HttpRequest req = HttpRequest.newBuilder()
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(safeUrl))
                 .timeout(Duration.ofSeconds(15))
                 .header("Accept", "application/json")
-                .GET()
-                .build();
+                .GET();
+
+        if (headers != null) {
+            headers.forEach(builder::header);
+        }
+
+        HttpRequest req = builder.build();
 
         return RetryUtils.executeWithExponentialBackoff(() -> {
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
@@ -71,26 +83,11 @@ public class HttpServiceImpl implements HttpService {
      * Perform a synchronous POST request with JSON body and retry logic.
      */
     public String postJson(String url, String jsonBody) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(15))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .build();
-
-        return RetryUtils.executeWithExponentialBackoff(() -> {
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-                return resp.body();
-            } else {
-                throw new RuntimeException("HTTP " + resp.statusCode() + " for " + url + " body:" + resp.body());
-            }
-        }, 3, 500);
+        return postJson(url, null, jsonBody);
     }
 
     /**
-     * POST request with headers
+     * POST request with headers.
      */
     public String postJson(String url, Map<String, String> headers, String jsonBody) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
@@ -117,7 +114,7 @@ public class HttpServiceImpl implements HttpService {
     }
 
     /**
-     * Perform an asynchronous GET request.
+     * Perform an asynchronous GET request (basic).
      */
     public CompletableFuture<String> getAsync(String url) {
         HttpRequest req = HttpRequest.newBuilder()

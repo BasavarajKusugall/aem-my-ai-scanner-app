@@ -67,7 +67,8 @@ public class Ta4jServiceImpl implements Ta4jService {
     public BarSeries buildSeries(String name, List<Candle> candles) {
         BarSeries series = new BaseBarSeriesBuilder().withName(name).build();
         for (Candle c : candles) {
-            ZonedDateTime endTime = Instant.ofEpochSecond(c.getTime()).atZone(ZoneId.of("UTC"));
+            Instant time = c.getTime();
+            ZonedDateTime endTime = time.atZone(ZoneId.of("UTC"));
             series.addBar(new BaseBar(
                     Duration.ofSeconds(config.default_bar_seconds()),
                     endTime,

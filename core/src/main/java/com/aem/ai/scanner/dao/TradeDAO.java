@@ -37,4 +37,5 @@ public interface TradeDAO {
     List<TelegramConfig> fetchTelegramDailyNewsConfigs();
     List<TelegramConfig> fetchTelegramDailyAlertsConfigs();
     List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs();
+    List<TelegramConfig> fetchTelegramBotUserIDConfigs(String bot_user_id);
 }

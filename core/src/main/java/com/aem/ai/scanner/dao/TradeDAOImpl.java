@@ -24,7 +24,6 @@ import java.util.Optional;
 public class TradeDAOImpl implements TradeDAO {
 
     private static final Logger logger = LoggerFactory.getLogger(TradeDAOImpl.class);
-    public static final String NSE_EQ = "NSE_EQ|";
 
 
     @Reference
@@ -63,7 +62,7 @@ public class TradeDAOImpl implements TradeDAO {
                 String symbol = rs.getString("SYMBOL");
                 String instrumentKey = rs.getString("INSTRUMENT_KEY");
                 String bestStrategy = rs.getString("BEST_STRATEGY");
-                InstrumentSymbol inst = new InstrumentSymbol(symbol, bestStrategy, NSE_EQ + instrumentKey);
+                InstrumentSymbol inst = new InstrumentSymbol(symbol, bestStrategy, GenericeConstants.NSE_EQ + instrumentKey);
                 watchlist.add(inst);
             }
             logger.info("Loaded {} symbols from nifty500_watchlist", watchlist.size());
@@ -206,27 +205,42 @@ public class TradeDAOImpl implements TradeDAO {
 
     // -------------------- TELEGRAM CONFIG --------------------
     public List<TelegramConfig> fetchTelegramConfigs() {
-        return fetchTelegramConfigs("ALL");
+        String cond = " AND purpose='ALL'";
+        return fetchTelegramConfigs(cond);
     }
+
 
     public List<TelegramConfig> fetchTelegramMonitorConfigs() {
-        return fetchTelegramConfigs("MONITOR");
-    }
-    public List<TelegramConfig> fetchTelegramDailyNewsConfigs() {
-        return fetchTelegramConfigs("NEWS");
-    }
-    public List<TelegramConfig> fetchTelegramDailyAlertsConfigs() {
-        return fetchTelegramConfigs("STOCKS_ALERTS");
-    }
-    public List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs() {
-        return fetchTelegramConfigs("CRYPTO_ALERTS");
+        String cond = " AND purpose='MONITOR'";
+        return fetchTelegramConfigs(cond);
     }
 
-    private List<TelegramConfig> fetchTelegramConfigs(String purposeFilter) {
+    public List<TelegramConfig> fetchTelegramDailyNewsConfigs() {
+        String cond = " AND purpose='NEWS'";
+        return fetchTelegramConfigs(cond);
+    }
+
+    public List<TelegramConfig> fetchTelegramDailyAlertsConfigs() {
+        String cond = " AND purpose='STOCKS_ALERTS'";
+        return fetchTelegramConfigs(cond);
+    }
+
+    public List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs() {
+        String cond = " AND purpose='CRYPTO_ALERTS'";
+        return fetchTelegramConfigs(cond);
+    }
+
+    @Override
+    public List<TelegramConfig> fetchTelegramBotUserIDConfigs(String bot_user_id) {
+        String botUserIdCond = " AND bot_user_id='" + bot_user_id + "'";
+        return fetchTelegramConfigs(botUserIdCond);
+    }
+
+    private List<TelegramConfig> fetchTelegramConfigs(String dynamicFilter) {
         List<TelegramConfig> configs = new ArrayList<>();
         String sql = "SELECT * FROM telegram_bot_config WHERE is_active = 1";
-        if (StringUtils.isNotEmpty(purposeFilter)){
-            sql += " AND purpose='" + purposeFilter + "'";
+        if (StringUtils.isNotEmpty(dynamicFilter)){
+            sql += dynamicFilter;
         }
 
         try (Connection conn = conn();

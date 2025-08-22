@@ -51,6 +51,7 @@ public class GeminiServiceImpl implements GeminiService {
     private String endpoint;
     private String promptFilePath;
     private String fundamentalAnalysisPromptFilePath;
+    private String portFolioAnalysisPromptFilePath;
 
     @ObjectClassDefinition(
             name = "Gemini Service Config",
@@ -68,6 +69,9 @@ public class GeminiServiceImpl implements GeminiService {
 
         @AttributeDefinition(name = "Fundament Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
         String gemini_fundamental_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/Morning_Update_Template.txt";
+
+        @AttributeDefinition(name = "Portfolio Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
+        String gemini_portfolio_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/portfolio_analysis_template.txt";
     }
 
     @Activate
@@ -77,9 +81,21 @@ public class GeminiServiceImpl implements GeminiService {
         this.endpoint = PropertiesUtil.toString(config.gemini_endpoint(), "");
         this.promptFilePath = PropertiesUtil.toString(config.gemini_daily_news_updates_prompt_path(), "");
         this.fundamentalAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_fundamental_analysis_prompt_path(), "");
+        this.portFolioAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_portfolio_analysis_prompt_path(), "");
         log.info("GeminiService activated with endpoint: {}", this.endpoint);
     }
+    @Override
+    public String analyzePortfolio(String portfolioJson) throws Exception {
+        HttpResponse<String> resp = getHttpResponse(portfolioJson, portFolioAnalysisPromptFilePath);
 
+        if (resp.statusCode() == 200) {
+            JsonNode geminiResp = mapper.readTree(resp.body());
+            return geminiResp.at("/candidates/0/content/parts/0/text").asText("").trim();
+        } else {
+            log.error("Gemini API error: {} {}", resp.statusCode(), resp.body());
+            throw new RuntimeException("Gemini API error: " + resp.statusCode() + " " + resp.body());
+        }
+    }
     @Override
     public TradeAnalysis fundamentalAnalysis(String signalMsg) throws Exception {
         log.info("Starting Gemini fundamentalAnalysis for signal...");
@@ -105,7 +121,7 @@ public class GeminiServiceImpl implements GeminiService {
         }
         String prompt = promptTemplate;
         if (StringUtils.isNotEmpty(signalMsg)){
-            prompt = String.format(promptTemplate, signalMsg);
+            prompt = promptTemplate+ signalMsg;//String.format(promptTemplate, signalMsg);
         }
 
         log.debug("Prepared prompt:\n{}", prompt);

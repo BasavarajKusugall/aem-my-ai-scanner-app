@@ -13,4 +13,5 @@ public interface GeminiService {
      */
     TradeAnalysis fundamentalAnalysis(String signalMsg) throws Exception;
     String todayNewsUpdates() throws Exception;
+    String analyzePortfolio(String portfolioJson) throws Exception;
 }

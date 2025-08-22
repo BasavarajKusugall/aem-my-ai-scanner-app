@@ -21,4 +21,6 @@ public interface TelegramService {
 
     /** Send message to monitor purpose accounts */
     void sendMonitorLog(String level, String text);
+
+    void sendMessageToUser(String telegramBotUserId, String message);
 }

@@ -254,13 +254,7 @@
             <groupId>commons-codec</groupId>
             <scope>provided</scope>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.zerodhatech.kiteconnect/kiteconnect -->
-        <dependency>
-            <groupId>com.zerodhatech.kiteconnect</groupId>
-            <artifactId>kiteconnect</artifactId>
-            <version>3.5.1</version>
-            <scope>provided</scope>
-        </dependency>
+
 
     </dependencies>
 

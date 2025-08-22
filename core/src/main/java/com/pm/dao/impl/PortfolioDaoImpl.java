@@ -1,5 +1,7 @@
 package com.pm.dao.impl;
 
+import com.GenericeConstants;
+import com.pm.dao.DataSourcePoolProviderService;
 import com.pm.dao.PortfolioDao;
 import com.pm.dto.*;
 import com.pm.services.InstrumentResolver;
@@ -8,7 +10,10 @@ import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component(service = PortfolioDao.class, immediate = true)
 public class PortfolioDaoImpl implements PortfolioDao {
@@ -24,6 +29,48 @@ public class PortfolioDaoImpl implements PortfolioDao {
     private static final String GREEN  = "\u001B[32m";
     private static final String YELLOW = "\u001B[33m";
     private static final String CYAN   = "\u001B[36m";
+    @Reference
+    private DataSourcePoolProviderService dataSourcePoolProviderService;
+
+    @Override
+    public List<UserBrokerAccount> fetchActiveAccounts() {
+       DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        if (dataSource == null) {
+            log.error(RED + "DataSource not found! Cannot perform portfolio sync." + RESET);
+            return null;
+        }
+        List<UserBrokerAccount> list = new ArrayList<>();
+        String sql = "SELECT account_id, user_id, broker_id, broker_name, broker_account_ref, " +
+                "account_alias, portfolio_holding_json, portfolio_positions_json, telegram_bot_user_id " +
+                "FROM user_broker_account " +
+                "WHERE status='ACTIVE' " +
+                "AND ((portfolio_holding_json IS NOT NULL AND portfolio_holding_json <> '' AND portfolio_holding_json <> '{}') " +
+                "OR (portfolio_positions_json IS NOT NULL AND portfolio_positions_json <> '' AND portfolio_positions_json <> '{}'))";
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                UserBrokerAccount uba = new UserBrokerAccount();
+                uba.setAccountId(rs.getLong("account_id"));
+                uba.setUserId(rs.getLong("user_id"));
+                uba.setBrokerId(rs.getLong("broker_id"));
+                uba.setBrokerName(rs.getString("broker_name"));
+                uba.setBrokerAccountRef(rs.getString("broker_account_ref"));
+                uba.setAccountAlias(rs.getString("account_alias"));
+                uba.setPortfolioHoldingJson(rs.getString("portfolio_holding_json"));
+                uba.setPortfolioPositionsJson(rs.getString("portfolio_positions_json"));
+                uba.setTelegramBotUserId(rs.getString("telegram_bot_user_id"));
+
+                list.add(uba);
+            }
+        } catch (Exception e) {
+            e.printStackTrace(); // replace with SLF4J logging
+        }
+        return list;
+    }
+
     @Override
     public void updateUserBrokerAccountJson(Connection c, BrokerAccountRef acc, PortfolioSnapshot snap) {
         String holdingJson  = snap.getHoldingsJson();
