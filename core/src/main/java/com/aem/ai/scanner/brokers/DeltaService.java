@@ -68,6 +68,10 @@ public class DeltaService extends BaseService {
                 out.add(new Candle(t,o,h,l,c,v));
             }
         }
+        if (!out.isEmpty()) {
+            out.sort(Comparator.comparing(Candle::getTime));
+            log.debug("Fetched {} candles for {} {}", out.size(), symbol, timeframe);
+        }
         return out;
     }
 
