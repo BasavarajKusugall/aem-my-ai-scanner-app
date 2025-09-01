@@ -4,7 +4,7 @@ package com.aem.ai.scanner.config;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 
-@ObjectClassDefinition(name = "Market Data Scheduler Configuration")
+@ObjectClassDefinition(name = "BSK Market Data Scheduler Configuration")
 public @interface MarketDataSchedulerConfig {
 
     @AttributeDefinition(

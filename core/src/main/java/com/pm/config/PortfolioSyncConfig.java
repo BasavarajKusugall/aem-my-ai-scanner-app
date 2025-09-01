@@ -3,7 +3,7 @@ package com.pm.config;
 
 import org.osgi.service.metatype.annotations.*;
 
-@ObjectClassDefinition(name = "Portfolio Sync Scheduler")
+@ObjectClassDefinition(name = "BSK Portfolio Sync Scheduler")
 public @interface PortfolioSyncConfig {
     @AttributeDefinition(name = "Enabled") boolean enabled() default true;
     @AttributeDefinition(name = "Cron (Quartz)") String cron() default "0 0/5 * * * ?"; // every 5 min

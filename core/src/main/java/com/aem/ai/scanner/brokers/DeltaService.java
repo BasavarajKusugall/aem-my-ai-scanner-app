@@ -18,7 +18,7 @@ public class DeltaService extends BaseService {
 
     private static final ObjectMapper om = new ObjectMapper();
 
-    @ObjectClassDefinition(name="Delta Exchange MarketData Service")
+    @ObjectClassDefinition(name="BSK Delta Exchange MarketData Service")
     public @interface Config {
         @AttributeDefinition(name="Base URL")
         String base_url() default "https://api.india.delta.exchange";

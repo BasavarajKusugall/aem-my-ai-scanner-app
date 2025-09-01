@@ -1,8 +1,11 @@
-package com.aem.ai.scanner.dao;
+package com.aem.ai.scanner.dao.impl;
 
 
 import com.GenericeConstants;
+import com.aem.ai.scanner.dao.DAOFactory;
+import com.aem.ai.scanner.dao.DAOConfig;
 import com.aem.ai.scanner.model.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pm.dao.DataSourcePoolProviderService;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
@@ -15,25 +18,23 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
-@Component(service = TradeDAO.class, immediate = true)
-@Designate(ocd = TradeDAOConfig.class)
-public class TradeDAOImpl implements TradeDAO {
+@Component(service = DAOFactory.class, immediate = true)
+@Designate(ocd = DAOConfig.class)
+public class DAOFactoryFactoryImpl implements DAOFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(TradeDAOImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(DAOFactoryFactoryImpl.class);
 
 
     @Reference
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
     private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_UPSTOX_TRADE_BOOK);
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
     }
     @Activate
-    protected void activate(TradeDAOConfig config) {
+    protected void activate(DAOConfig config) {
         logger.info("TradeDAO activated with DataSource: {}", config.datasourceName());
     }
 
@@ -73,7 +74,7 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- INSERT TRADE --------------------
-    public void insertTrade(Trade t, TradeAnalysis tradeAnalysis) throws SQLException {
+    public void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis) throws SQLException {
         String sql = "INSERT INTO trades(" +
                 "instrument_key, symbol, side, entry_price, ltp, stop_loss, target, quantity, entry_time, " +
                 "exit_price, exit_time, status, pnl, orderType, TIMEFRAME, " +
@@ -123,7 +124,7 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- FIND OPEN TRADE --------------------
-    public Optional<Trade> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side) throws SQLException {
+    public Optional<TradeModel> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side) throws SQLException {
         String sql = "SELECT * FROM trades WHERE symbol = ? AND side = ? AND status = 'OPEN' ORDER BY entry_time DESC LIMIT 1";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, symbol.getInstrumentKey());
@@ -136,7 +137,7 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- UPDATE LTP & PNL --------------------
-    public void updateLtp(Trade t, double ltp) throws SQLException {
+    public void updateLtp(TradeModel t, double ltp) throws SQLException {
         String sql = "UPDATE trades SET ltp = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE symbol = ? AND status = 'OPEN'";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             double pnl = ltp - t.getEntryPrice();
@@ -159,7 +160,7 @@ public class TradeDAOImpl implements TradeDAO {
         }
     }
 
-    public void closeTradeWithPnl(Trade t) throws SQLException {
+    public void closeTradeWithPnl(TradeModel t) throws SQLException {
         String sql = "UPDATE trades SET status = 'CLOSED', exit_price = ?, exit_time = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE status = 'OPEN' AND symbol = ?";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, t.getExitPrice());
@@ -181,7 +182,7 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- GET TRADE BY ID --------------------
-    public Optional<Trade> getTradeById(String tradeId) throws SQLException {
+    public Optional<TradeModel> getTradeById(String tradeId) throws SQLException {
         String sql = "SELECT * FROM trades WHERE trade_id = ?";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, tradeId);
@@ -193,14 +194,14 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- LIST OPEN TRADES --------------------
-    public List<Trade> listOpenTrades() throws SQLException {
+    public List<TradeModel> listOpenTrades() throws SQLException {
         String sql = "SELECT * FROM trades WHERE status = 'OPEN'";
-        List<Trade> trades = new ArrayList<>();
+        List<TradeModel> tradeModels = new ArrayList<>();
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) trades.add(mapRow(rs));
+            while (rs.next()) tradeModels.add(mapRow(rs));
         }
-        return trades;
+        return tradeModels;
     }
 
     // -------------------- TELEGRAM CONFIG --------------------
@@ -266,22 +267,110 @@ public class TradeDAOImpl implements TradeDAO {
     }
 
     // -------------------- MAP ROW --------------------
-    private Trade mapRow(ResultSet rs) throws SQLException {
+    private TradeModel mapRow(ResultSet rs) throws SQLException {
         String instrumentKey = rs.getString("instrument_key");
         InstrumentSymbol is = new InstrumentSymbol(rs.getString("symbol"), instrumentKey);
-        Trade trade = new Trade(is,
+        TradeModel tradeModel = new TradeModel(is,
                 Signal.Side.valueOf(rs.getString("side")),
                 rs.getDouble("entry_price"),
                 rs.getDouble("stop_loss"),
                 rs.getDouble("target"),
                 rs.getInt("quantity"));
-        trade.setTradeId(rs.getString("trade_id"));
-        trade.setExitPrice(rs.getDouble("exit_price"));
+        tradeModel.setTradeId(rs.getString("trade_id"));
+        tradeModel.setExitPrice(rs.getDouble("exit_price"));
         Timestamp exitTime = rs.getTimestamp("exit_time");
-        if (exitTime != null) trade.setExitTime(exitTime.toLocalDateTime());
-        trade.setPnl(rs.getDouble("pnl"));
-        trade.setTimeFrame(rs.getString("TIMEFRAME"));
-        trade.setStatus(Trade.Status.valueOf(rs.getString("status")));
-        return trade;
+        if (exitTime != null) tradeModel.setExitTime(exitTime.toLocalDateTime());
+        tradeModel.setPnl(rs.getDouble("pnl"));
+        tradeModel.setTimeFrame(rs.getString("TIMEFRAME"));
+        tradeModel.setStatus(TradeModel.Status.valueOf(rs.getString("status")));
+        return tradeModel;
     }
+
+    public List<StrategyConfig> loadActiveStrategies() throws Exception {
+        List<StrategyConfig> strategies = new ArrayList<>();
+        String sql = "SELECT id, name, symbol, timeframe, json_config FROM strategies WHERE status='ACTIVE'";
+        ObjectMapper mapper = new ObjectMapper();
+        try (Connection conn = conn();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                StrategyConfig cfg = mapper.readValue(rs.getString("json_config"), StrategyConfig.class);
+                cfg.setId(rs.getInt("id"));
+                cfg.setName(rs.getString("name"));
+                cfg.setSymbol(rs.getString("symbol"));
+                cfg.setTimeframe(rs.getString("timeframe"));
+                strategies.add(cfg);
+            }
+        }
+        return strategies;
+    }
+
+    public void persistBestStrategies(String watchListTable, String symbol, List<StrategyResult> bestConfigs) {
+        if (StringUtils.isEmpty(watchListTable) || bestConfigs == null || bestConfigs.isEmpty()) {
+            logger.warn("No best strategies to persist for symbol: {}", symbol);
+            return;
+        }
+
+        String selectSql = "SELECT BEST_STRATEGY FROM " + watchListTable + " WHERE SYMBOL=?";
+        String updateSql = "UPDATE " + watchListTable + " SET BEST_STRATEGY=? WHERE SYMBOL=?";
+
+        try (Connection c = conn()) {
+            ObjectMapper mapper = new ObjectMapper();
+            List<StrategyResult> existing = new ArrayList<>();
+
+            // === Step 1: Load existing JSON ===
+            try (PreparedStatement ps = c.prepareStatement(selectSql)) {
+                ps.setString(1, symbol);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && rs.getString("BEST_STRATEGY") != null) {
+                        String json = rs.getString("BEST_STRATEGY");
+                        if (StringUtils.isNotEmpty(json)){
+                            existing = mapper.readValue(json,
+                                    mapper.getTypeFactory().constructCollectionType(List.class, StrategyResult.class));
+                        }
+
+                    }
+                }
+            }
+
+            // === Step 2: Check if new results are better ===
+            boolean shouldUpdate = false;
+            for (StrategyResult newRes : bestConfigs) {
+                for (StrategyResult oldRes : existing) {
+                    if (newRes.getName().equalsIgnoreCase(oldRes.getName())) {
+                        // Compare winRate & pnl
+                        if (newRes.getPnl() >= oldRes.getPnl() + 0.01 ||
+                                newRes.getWinRate() > oldRes.getWinRate()) {
+                            shouldUpdate = true;
+                            break;
+                        }
+                    } else {
+                        // Completely new strategy – consider updating
+                        shouldUpdate = true;
+                    }
+                }
+            }
+
+            // === Step 3: Persist only if improved ===
+            if (shouldUpdate) {
+                String newJson = mapper.writeValueAsString(bestConfigs);
+                try (PreparedStatement ps = c.prepareStatement(updateSql)) {
+                    ps.setString(1, newJson);
+                    ps.setString(2, symbol);
+                    ps.executeUpdate();
+                    logger.info("🏆 Updated BEST_STRATEGY for {} -> {}", symbol, newJson);
+                }
+            } else {
+                logger.info("✅ No update: Existing strategies for {} are still better/equal", symbol);
+            }
+        } catch (Exception e) {
+            logger.error("❌ Failed updating BEST_STRATEGY for {}: {}", symbol, e.getMessage(), e);
+        }
+    }
+
+
+
+
+
 }

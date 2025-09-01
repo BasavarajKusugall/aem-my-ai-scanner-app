@@ -3,7 +3,7 @@ package com.pm.config;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
-@ObjectClassDefinition(name="Upstox Connector Config")
+@ObjectClassDefinition(name="BSK Upstox Connector Config")
 public @interface UpstoxConfig {
     @AttributeDefinition(name="Client ID") String clientId();
     @AttributeDefinition(name="Client Secret") String clientSecret();

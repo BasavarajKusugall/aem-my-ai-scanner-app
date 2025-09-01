@@ -3,7 +3,7 @@ package com.pm.config;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
-@ObjectClassDefinition(name="Zerodha (Kite) Connector Config")
+@ObjectClassDefinition(name="BSK Zerodha (Kite) Connector Config")
 public @interface KiteConfig {
     @AttributeDefinition(name="API Key") String apiKey();
     @AttributeDefinition(name="API Secret") String apiSecret();

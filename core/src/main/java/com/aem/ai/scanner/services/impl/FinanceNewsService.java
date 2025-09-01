@@ -20,7 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 @ObjectClassDefinition(
-        name = "Finance News Service Configuration",
+        name = "BSK Finance News Service Configuration",
         description = "Configuration for Finance News Service fetching from Perplexity API"
 )
 @interface FinanceNewsServiceConfig {

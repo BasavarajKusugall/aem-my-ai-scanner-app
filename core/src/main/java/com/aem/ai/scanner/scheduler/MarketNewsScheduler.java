@@ -27,7 +27,7 @@ public class MarketNewsScheduler implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(MarketNewsScheduler.class);
 
     @ObjectClassDefinition(
-            name = "Market News Fetch Scheduler",
+            name = "BSK Market News Fetch Scheduler",
             description = "Fetches latest market finance news updates from Perplexity AI API"
     )
     public @interface Config {

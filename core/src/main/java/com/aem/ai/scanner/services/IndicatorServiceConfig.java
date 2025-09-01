@@ -5,7 +5,7 @@ import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 @ObjectClassDefinition(
-        name = "Indicator Service Configuration",
+        name = "BSK Indicator Service Configuration",
         description = "Configuration for TA4J-based Indicator Service"
 )
 public @interface IndicatorServiceConfig {

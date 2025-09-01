@@ -99,7 +99,7 @@ CREATE TABLE `broker` (
 
 LOCK TABLES `broker` WRITE;
 /*!40000 ALTER TABLE `broker` DISABLE KEYS */;
-INSERT INTO `broker` VALUES (1,'UPSTOX','Upstox Securities','https://api.upstox.com','ACTIVE','2025-08-19 16:05:25'),(2,'ZERODHA','Zerodha Kite','https://api.kite.trade','ACTIVE','2025-08-19 17:12:55');
+INSERT INTO `broker` VALUES (1,'UPSTOX','Upstox Securities','https://api.upstox.com','ACTIVE','2025-08-19 16:05:25'),(2,'ZERODHA','Zerodha Kite','https://api.kite.tradeModel','ACTIVE','2025-08-19 17:12:55');
 /*!40000 ALTER TABLE `broker` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

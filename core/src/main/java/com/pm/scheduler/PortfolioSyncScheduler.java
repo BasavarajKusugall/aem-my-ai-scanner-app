@@ -25,7 +25,7 @@ public class PortfolioSyncScheduler implements Runnable {
     private Config config;
 
     @ObjectClassDefinition(
-            name = "Portfolio Sync Scheduler",
+            name = "BSK Portfolio Sync Scheduler",
             description = "Scheduler that syncs user portfolios from all brokers"
     )
     public @interface Config {

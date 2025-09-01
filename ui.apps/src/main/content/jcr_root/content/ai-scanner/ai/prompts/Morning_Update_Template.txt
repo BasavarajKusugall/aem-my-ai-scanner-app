@@ -3,7 +3,7 @@ NIFTY:
 {Insert Nifty summary – mention previous day’s closing trend, range, key
 supports/resistances, breakout/sideways outlook. Example: “Nifty ended
 flat in a narrow range, holding above {NIFTY_SUPPORT}. A breakout above
-{NIFTY_RESISTANCE} may trigger a fresh rally; below this, trade may
+{NIFTY_RESISTANCE} may trigger a fresh rally; below this, tradeModel may
 remain sideways.”}
 
 BANK NIFTY:

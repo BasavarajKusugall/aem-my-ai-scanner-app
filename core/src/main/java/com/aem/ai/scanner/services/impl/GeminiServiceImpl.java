@@ -54,7 +54,7 @@ public class GeminiServiceImpl implements GeminiService {
     private String portFolioAnalysisPromptFilePath;
 
     @ObjectClassDefinition(
-            name = "Gemini Service Config",
+            name = "BSK Gemini Service Config",
             description = "Configuration for Gemini AI Service"
     )
     public @interface Config {

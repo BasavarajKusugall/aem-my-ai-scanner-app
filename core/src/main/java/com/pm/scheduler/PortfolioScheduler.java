@@ -29,7 +29,7 @@ public class PortfolioScheduler implements Runnable {
     private Config config;
 
     @ObjectClassDefinition(
-            name = "Portfolio Analysis Scheduler",
+            name = "BSK Portfolio Analysis Scheduler",
             description = "Runs Gemini AI portfolio analysis and sends results to Telegram"
     )
     public @interface Config {

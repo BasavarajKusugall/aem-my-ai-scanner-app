@@ -34,7 +34,7 @@ public class Ta4jServiceImpl implements Ta4jService {
     private static final Logger log = LoggerFactory.getLogger(Ta4jServiceImpl.class);
 
     @ObjectClassDefinition(
-            name = "Ta4j Service Config",
+            name = "BSK Ta4j Service Config",
             description = "Configuration for technical indicator calculations"
     )
     public @interface Config {

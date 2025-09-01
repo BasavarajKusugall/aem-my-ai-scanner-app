@@ -19,7 +19,7 @@ public class MySQLService {
 
 
     private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_UPSTOX_TRADE_BOOK);
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
     }
 
 

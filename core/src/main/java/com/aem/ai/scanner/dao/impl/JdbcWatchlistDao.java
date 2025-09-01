@@ -24,9 +24,9 @@ public class JdbcWatchlistDao implements WatchlistDao {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
     private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_UPSTOX_TRADE_BOOK);
+        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
     }
-    @ObjectClassDefinition(name="MarketData Watchlist DAO")
+    @ObjectClassDefinition(name="BSK MarketData Watchlist DAO")
     public @interface Config {
         @AttributeDefinition(name="Upstox table (nifty50 or nifty500)", description="Table with INSTRUMENT_KEY or SYMBOL")
         String upstox_table() default "nifty500_watchlist";
@@ -41,7 +41,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
         String delta_symbol_col() default "SYMBOL";
     }
 
-    private Config cfg;
+    public Config cfg;
 
     @Activate @Modified
     protected void activate(Config cfg) { this.cfg = cfg; }
@@ -54,6 +54,16 @@ public class JdbcWatchlistDao implements WatchlistDao {
     @Override
     public List<InstrumentSymbol> symbolsForDelta() {
         return read(cfg.delta_table(), "DELTA");
+    }
+
+    @Override
+    public String upstoxTable() {
+        return cfg.upstox_table();
+    }
+
+    @Override
+    public String deltaTable() {
+        return cfg.delta_table();
     }
 
     private List<InstrumentSymbol> read(String table, String type) {

@@ -7,9 +7,9 @@ import java.time.format.DateTimeFormatter;
 /**
  * Represents a Trade persisted to MySQL TradeBook (Upstox_TradeBook).
  */
-public class Trade {
+public class TradeModel {
 
-    private static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
+    public static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter IST_FORMATTER =
             DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm:ss").withZone(IST_ZONE);
 
@@ -39,12 +39,12 @@ public class Trade {
         this.timeFrame = timeFrame;
     }
 
-    public Trade(InstrumentSymbol symbol,
-                 Signal.Side side,
-                 double entryPrice,
-                 double stopLoss,
-                 double target,
-                 int quantity) {
+    public TradeModel(InstrumentSymbol symbol,
+                      Signal.Side side,
+                      double entryPrice,
+                      double stopLoss,
+                      double target,
+                      int quantity) {
         this.symbol = symbol;
         this.side = side;
         this.entryPrice = entryPrice;
@@ -55,22 +55,22 @@ public class Trade {
         this.status = Status.OPEN;
     }
 
-    public Trade() {
+    public TradeModel() {
     }
 
     /** Used when loading from DB */
-    public Trade(String tradeId,
-                 InstrumentSymbol symbol,
-                 Signal.Side side,
-                 double entryPrice,
-                 double stopLoss,
-                 double target,
-                 int quantity,
-                 LocalDateTime entryTime,
-                 double exitPrice,
-                 LocalDateTime exitTime,
-                 Status status,
-                 double pnl) {
+    public TradeModel(String tradeId,
+                      InstrumentSymbol symbol,
+                      Signal.Side side,
+                      double entryPrice,
+                      double stopLoss,
+                      double target,
+                      int quantity,
+                      LocalDateTime entryTime,
+                      double exitPrice,
+                      LocalDateTime exitTime,
+                      Status status,
+                      double pnl) {
         this.tradeId = tradeId;
         this.symbol = symbol;
         this.side = side;

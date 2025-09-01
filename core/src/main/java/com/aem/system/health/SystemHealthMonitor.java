@@ -19,7 +19,7 @@ public class SystemHealthMonitor implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(SystemHealthMonitor.class);
 
-    @ObjectClassDefinition(name = "System Health Monitor")
+    @ObjectClassDefinition(name = "BSK System Health Monitor")
     public @interface Config {
         @AttributeDefinition(name = "CPU Threshold (%)", defaultValue = "80")
         int cpuThreshold();

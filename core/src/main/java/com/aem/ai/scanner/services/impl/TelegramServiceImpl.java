@@ -1,7 +1,7 @@
 package com.aem.ai.scanner.services.impl;
 
 
-import com.aem.ai.scanner.dao.TradeDAO;
+import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.model.TelegramConfig;
 import com.aem.ai.scanner.services.HttpService;
 import com.aem.ai.scanner.services.TelegramService;
@@ -24,35 +24,35 @@ public class TelegramServiceImpl implements TelegramService {
     private HttpService http;
 
     @Reference
-    private TradeDAO tradeDAO; // Injected via OSGi
+    private DAOFactory DAOFactory; // Injected via OSGi
 
     private static final int TELEGRAM_MESSAGE_LIMIT = 4096;
 
 
     /** Send message to ALL telegram accounts */
     public void sendMessage(String text) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramConfigs();
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramConfigs();
         for (TelegramConfig cfg : configs) {
             sendToConfig(cfg, text);
         }
     }
     /** Send message to ALL telegram accounts */
     public void sendMessageDailyNews(String text) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyNewsConfigs();
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramDailyNewsConfigs();
         for (TelegramConfig cfg : configs) {
             sendToConfig(cfg, text);
         }
     }
     /** Send message to ALL telegram accounts */
     public void sendMessageDailyStocksAlerts(String text) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyAlertsConfigs();
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramDailyAlertsConfigs();
         for (TelegramConfig cfg : configs) {
             sendToConfig(cfg, text);
         }
     }
     /** Send message to ALL telegram accounts */
     public void sendMessageDailyCryptoAlerts(String text) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramDailyCryptoAlertsConfigs();
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramDailyCryptoAlertsConfigs();
         for (TelegramConfig cfg : configs) {
             sendToConfig(cfg, text);
         }
@@ -60,7 +60,7 @@ public class TelegramServiceImpl implements TelegramService {
 
     /** Send only to MONITOR purpose accounts */
     public void sendMonitorLog(String level, String text) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramMonitorConfigs();
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramMonitorConfigs();
         for (TelegramConfig cfg : configs) {
             if ("MONITOR".equalsIgnoreCase(cfg.getPurpose())) {
                 String decorated = "[" + level + "] " + text;
@@ -71,7 +71,7 @@ public class TelegramServiceImpl implements TelegramService {
 
     @Override
     public void sendMessageToUser(String telegramBotUserId, String message) {
-        List<TelegramConfig> configs = tradeDAO.fetchTelegramBotUserIDConfigs(telegramBotUserId);
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramBotUserIDConfigs(telegramBotUserId);
         for (TelegramConfig cfg : configs) {
             sendToConfig(cfg, message);
         }

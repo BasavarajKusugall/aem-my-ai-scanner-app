@@ -26,7 +26,7 @@ public class UpstoxService extends BaseService {
     private static final Logger log = LoggerFactory.getLogger(UpstoxService.class);
     private static final ObjectMapper om = new ObjectMapper();
 
-    @ObjectClassDefinition(name="Upstox MarketData Service")
+    @ObjectClassDefinition(name="BSK Upstox MarketData Service")
     public @interface Config {
         @AttributeDefinition(name="Base URL")
         String base_url() default "https://api.upstox.com/v3";
