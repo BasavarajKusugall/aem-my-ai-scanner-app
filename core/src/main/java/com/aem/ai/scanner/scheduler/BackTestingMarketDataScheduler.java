@@ -18,13 +18,13 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
-@Designate(ocd = MarketDataScheduler.Config.class)
+@Designate(ocd = BackTestingMarketDataScheduler.Config.class)
 @Component(service = Runnable.class, immediate = true)
-public class MarketDataScheduler implements Runnable {
+public class BackTestingMarketDataScheduler implements Runnable {
 
-    private static final Logger log = LoggerFactory.getLogger(MarketDataScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(BackTestingMarketDataScheduler.class);
 
-    @ObjectClassDefinition(name="Market Data Fetch Scheduler")
+    @ObjectClassDefinition(name="Backtest Market Data Fetch Scheduler")
     public @interface Config {
         @AttributeDefinition(name="Enable")
         boolean enable() default true;

@@ -1,6 +1,7 @@
 package com.aem.system.listner;
 
 
+import com.aem.ai.scanner.services.TelegramService;
 import com.aem.system.MyEmailService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -20,6 +21,9 @@ public class GlobalErrorListener implements LogListener {
     @Reference
     private MyEmailService myEmailService;
 
+    @Reference
+    private TelegramService telegramService;
+
     @Override
     public void logged(LogEntry entry) {
         if (entry.getLevel() == LogService.LOG_ERROR) {
@@ -36,16 +40,7 @@ public class GlobalErrorListener implements LogListener {
 
     private void sendErrorEmail(String message, Throwable ex) {
         try {
-            String template = "/content/ai-scanner/email/notifications/system-notification.html";
-            Map<String, String> mailContent = new HashMap<>();
-            mailContent.put("subject",message);
-            mailContent.put("body", ex.getMessage());
-          /*  List<String> strings = emailService.sendEmail(template, mailContent, "basavaraj.kusugall@gmail.com");
-            if (strings != null && !strings.isEmpty()) {
-                log.error("Failed to send alert email to: {}", String.join(", ", strings));
-            } else {
-                log.info("Alert email sent successfully to {}", message);
-            }*/
+            telegramService.sendMonitorLog(message, ex.getMessage());
 
         } catch (Exception e) {
             log.error("Failed to send alert email", e);

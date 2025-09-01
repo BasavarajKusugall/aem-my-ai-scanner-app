@@ -51,13 +51,21 @@ public class UpstoxService extends BaseService {
         String interval = inferInterval(timeframe);
         String url;
         if (historical) {
-            // Fetch last N units using date range: from now - N*interval to now
             OffsetDateTime now = OffsetDateTime.now();
-            OffsetDateTime from = now.minusMinutes(minutesFor(timeframe) * (long)count);
-            String fromD = nowFormatter().format(from);
-            String toD   = nowFormatter().format(now);
-            url = String.format("%s/historical-candle/%s/%s/%s/%s",
-                    cfg.base_url(), symbolOrKey.getInstrumentKey(), unit, fromD, toD);
+            OffsetDateTime from = now.minusDays(count);
+
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            String fromD = dateFormatter.format(from);
+            String toD   = dateFormatter.format(now);
+            url = String.format("%s/historical-candle/%s/%s/%d/%s/%s",
+                    cfg.base_url(),
+                    symbolOrKey.getInstrumentKey(),
+                    unit,          // e.g. "day" or "5m"
+                    1,             // unit count (depends on API spec, often 1)
+                    toD,
+                    fromD
+            );
         } else {
             url = String.format("%s/historical-candle/intraday/%s/%s/%s",
                     cfg.base_url(), symbolOrKey.getInstrumentKey(), unit, interval);
