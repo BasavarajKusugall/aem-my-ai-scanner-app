@@ -1,7 +1,9 @@
 package com.aem.ai.scanner.utils;
 
-import java.util.*;
-import java.util.regex.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Timeframes {
     private static final Pattern P = Pattern.compile("\\s*([0-9]+[mhdw]|[1-9][0-9]*[mhdw])\\s*:\\s*([0-9]+)\\s*");

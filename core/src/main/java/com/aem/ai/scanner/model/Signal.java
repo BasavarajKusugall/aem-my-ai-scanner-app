@@ -8,6 +8,16 @@ import java.util.UUID;
  * Represents a trading signal.
  */
 public class Signal {
+    private double score;
+
+    public double getScore() {
+        return score;
+    }
+
+    public void setScore(double score) {
+        this.score = score;
+    }
+
     public enum Side {BUY, SELL}
     private final String id;
     private final InstrumentSymbol symbol;

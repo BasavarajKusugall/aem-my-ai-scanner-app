@@ -9,6 +9,7 @@ public interface MarketDataService {
     /** Short code of the broker, e.g., UPSTOX, DELTA. */
     String brokerCode();
 
+    boolean enabled();
     /**
      * Fetch candles for a symbol.
      * @param symbol broker-specific symbol (or instrument key for Upstox)

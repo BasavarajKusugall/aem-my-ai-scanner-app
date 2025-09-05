@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface Ta4jService {
 
-    BarSeries buildSeries(String name, List<Candle> candles);
+    BarSeries buildSeries(String name, List<Candle> candles,String timeframe);
 
     double rsi(BarSeries series, int barIndex, int timeFrame);
 

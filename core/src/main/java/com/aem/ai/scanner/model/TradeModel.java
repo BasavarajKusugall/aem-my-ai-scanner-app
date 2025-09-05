@@ -26,6 +26,24 @@ public class TradeModel {
     private LocalDateTime exitTime;
     private Status status; // OPEN, CLOSED, CANCELLED
     private double pnl;
+    private double ltp;
+    private double pnlPercentage;
+
+    public void setLtp(double ltp) {
+        this.ltp = ltp;
+    }
+
+    public double getLtp() {
+        return ltp;
+    }
+
+    public void setPnlPercentage(double pnlPercentage) {
+        this.pnlPercentage = pnlPercentage;
+    }
+
+    public double getPnlPercentage() {
+        return pnlPercentage;
+    }
 
     public enum Status {
         OPEN, CLOSED, CANCELLED

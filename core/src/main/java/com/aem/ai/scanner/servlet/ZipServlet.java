@@ -16,21 +16,19 @@
  */
 package com.aem.ai.scanner.servlet;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.ZipOutputStream;
-import java.util.zip.ZipEntry;
-
-import javax.servlet.Servlet;
-import javax.servlet.ServletException;
-
+import org.apache.sling.api.SlingHttpServletRequest;
+import org.apache.sling.api.SlingHttpServletResponse;
+import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
 
-import org.apache.sling.api.resource.Resource;
-import org.apache.sling.api.SlingHttpServletRequest;
-import org.apache.sling.api.SlingHttpServletResponse;
-import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
+import javax.servlet.Servlet;
+import javax.servlet.ServletException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Download servlet

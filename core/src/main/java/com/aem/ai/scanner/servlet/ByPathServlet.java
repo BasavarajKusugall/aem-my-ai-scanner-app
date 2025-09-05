@@ -16,20 +16,18 @@
  */
 package com.aem.ai.scanner.servlet;
 
-import java.io.IOException;
-import java.io.Writer;
-
-import javax.servlet.Servlet;
-import javax.servlet.ServletException;
-
-import org.osgi.framework.Constants;
-import org.osgi.service.component.annotations.Component;
-
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
+import org.osgi.framework.Constants;
+import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.Servlet;
+import javax.servlet.ServletException;
+import java.io.IOException;
+import java.io.Writer;
 
 /**
  * Hello World Servlet registered by path

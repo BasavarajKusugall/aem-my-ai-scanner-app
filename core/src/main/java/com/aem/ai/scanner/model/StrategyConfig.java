@@ -1,15 +1,43 @@
 package com.aem.ai.scanner.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.ArrayList;
 import java.util.List;
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyConfig {
     private String name;
     private String symbol;
     private String timeframe;
     private List<RuleConfig> rules;
     private int id;
+    private double winRate;
+    private double pnl;
+    private double drawdown;
 
+    public double getPnl() {
+        return pnl;
+    }
+
+    public void setPnl(double pnl) {
+        this.pnl = pnl;
+    }
+
+    public double getDrawdown() {
+        return drawdown;
+    }
+
+    public void setDrawdown(double drawdown) {
+        this.drawdown = drawdown;
+    }
+
+    public double getWinRate() {
+        return winRate;
+    }
+
+    public void setWinRate(double winRate) {
+        this.winRate = winRate;
+    }
 
     // getters and setters
     // ...

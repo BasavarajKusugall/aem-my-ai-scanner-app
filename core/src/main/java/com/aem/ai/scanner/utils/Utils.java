@@ -1,12 +1,16 @@
 package com.aem.ai.scanner.utils;
 
 import com.aem.ai.scanner.model.Candle;
+import com.aem.ai.scanner.model.InstrumentSymbol;
+import com.aem.ai.scanner.model.Signal;
+import com.aem.ai.scanner.model.StrategyConfig;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -54,5 +58,33 @@ public class Utils {
                 amount,
                 trades
         );
+    }
+    public static String formatTradeSignalMessage(InstrumentSymbol symbol,
+                                            String timeframe,
+                                            StrategyConfig sc,
+                                            Signal signal,
+                                            String comment) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📈📊 ================= TRADE SIGNAL =================\n");
+        sb.append("🛠 Strategy: ").append(sc.getName()).append("\n");
+        sb.append("📌 Symbol: ").append(symbol.getSymbol()).append("\n");
+        sb.append("⏱ Timeframe: ").append(timeframe).append("\n");
+        sb.append("🔀 Side: ").append(signal.getSide()).append("\n");
+        sb.append("💰 Entry Price: ").append(signal.getEntryPrice()).append("\n");
+
+        if (!Double.isNaN(signal.getStopLoss())) {
+            sb.append("🛡 Stop Loss: ").append(signal.getStopLoss()).append("\n");
+        }
+
+        if (!Double.isNaN(signal.getTarget())) {
+            sb.append("🎯 Target: ").append(signal.getTarget()).append("\n");
+        }
+
+        sb.append("⭐ Confidence: ").append(String.format("%.2f", signal.getConfidence())).append("\n");
+        sb.append("🏷 Score: ").append(String.format("%.2f", signal.getScore())).append("\n");
+        sb.append("📝 Comment: ").append(comment).append("\n");
+        sb.append("🕒 Generated: ").append(LocalDateTime.now()).append("\n");
+        sb.append("📈📊 ==============================================\n");
+        return sb.toString();
     }
 }

@@ -11,7 +11,7 @@ public interface GeminiService {
      * @return TradeAnalysis object containing analysis result
      * @throws Exception if Gemini API call or parsing fails
      */
-    TradeAnalysis fundamentalAnalysis(String signalMsg) throws Exception;
+    TradeAnalysis tradeSignalAnalysis(String signalMsg) throws Exception;
     String todayNewsUpdates() throws Exception;
     String analyzePortfolio(String portfolioJson) throws Exception;
 }

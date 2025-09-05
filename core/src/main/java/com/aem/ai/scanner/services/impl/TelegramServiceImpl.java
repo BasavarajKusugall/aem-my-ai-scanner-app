@@ -127,7 +127,7 @@ public class TelegramServiceImpl implements TelegramService {
                 // Add delay if more chunks are left
                 if (i < totalChunks - 1) {
                     try {
-                        Thread.sleep(200); // 200 ms delay
+                        Thread.sleep(100); // 200 ms delay
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.warn("Chunk sending interrupted", ie);

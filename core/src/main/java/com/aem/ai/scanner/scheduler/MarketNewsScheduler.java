@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * Scheduler that fetches Market Finance News every X minutes
  */
 @Designate(ocd = MarketNewsScheduler.Config.class)
-@Component(service = Runnable.class)
+@Component(service = Runnable.class, immediate = true)
 public class MarketNewsScheduler implements Runnable {
 
     @Reference

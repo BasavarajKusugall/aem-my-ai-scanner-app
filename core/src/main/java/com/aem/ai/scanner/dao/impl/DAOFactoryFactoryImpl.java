@@ -1,12 +1,11 @@
 package com.aem.ai.scanner.dao.impl;
 
-
 import com.GenericeConstants;
-import com.aem.ai.scanner.dao.DAOFactory;
+import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.scanner.dao.DAOConfig;
+import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.model.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pm.dao.DataSourcePoolProviderService;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -18,7 +17,9 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @Component(service = DAOFactory.class, immediate = true)
 @Designate(ocd = DAOConfig.class)
@@ -73,9 +74,47 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         return watchlist;
     }
 
+    // in DAOFactoryFactoryImpl
+    public int appendOpenTradeComment(InstrumentSymbol symbol, Signal.Side side, String comment, String tableName) throws SQLException {
+        String sql = "UPDATE " +tableName+
+                "\t  SET comments = CONCAT(COALESCE(comments, ''), CASE WHEN comments IS NULL OR comments = '' THEN '' ELSE '\n' END, ?), " +
+                "    last_updated = CURRENT_TIMESTAMP " +
+                "WHERE symbol = ? AND side = ? AND status = 'OPEN'";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, comment);
+            ps.setString(2, symbol.getSymbol());
+            ps.setString(3, side.name());
+            return ps.executeUpdate();
+        }
+    }
+    public boolean insertTradeIfNoOpen(TradeModel t, TradeAnalysis analysis,String tableName) throws SQLException {
+        String sel = "SELECT trade_id FROM "+tableName+" WHERE symbol = ? AND side = ? AND status='OPEN' FOR UPDATE";
+        try (Connection c = conn()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement(sel)) {
+                ps.setString(1, t.getSymbol().getSymbol());
+                ps.setString(2, t.getSide().name());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        c.commit();
+                        return false; // existing open
+                    }
+                }
+            }
+            // insert
+            // ... use prepared statement similar to insertTrade but on same connection c ...
+            c.commit();
+            return true;
+        } catch (SQLException e) {
+            // rollback & rethrow
+            throw e;
+        }
+    }
+
+
     // -------------------- INSERT TRADE --------------------
-    public void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis) throws SQLException {
-        String sql = "INSERT INTO trades(" +
+    public void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis,  String tableName) throws SQLException {
+        String sql = "INSERT INTO "+tableName+"(" +
                 "instrument_key, symbol, side, entry_price, ltp, stop_loss, target, quantity, entry_time, " +
                 "exit_price, exit_time, status, pnl, orderType, TIMEFRAME, " +
                 "confidence_score, global_news_sentiment, market_trend, open_interest_build_up, " +
@@ -124,10 +163,10 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     }
 
     // -------------------- FIND OPEN TRADE --------------------
-    public Optional<TradeModel> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side) throws SQLException {
-        String sql = "SELECT * FROM trades WHERE symbol = ? AND side = ? AND status = 'OPEN' ORDER BY entry_time DESC LIMIT 1";
+    public Optional<TradeModel> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side,String tableName) throws SQLException {
+        String sql = "SELECT * FROM "+tableName+" WHERE symbol = ? AND side = ? AND status = 'OPEN' ORDER BY entry_time DESC LIMIT 1";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, symbol.getInstrumentKey());
+            ps.setString(1, symbol.getSymbol()); // fix: use display symbol (not instrument key)
             ps.setString(2, side.name());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return Optional.of(mapRow(rs));
@@ -137,68 +176,53 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     }
 
     // -------------------- UPDATE LTP & PNL --------------------
-    public void updateLtp(TradeModel t, double ltp) throws SQLException {
-        String sql = "UPDATE trades SET ltp = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE symbol = ? AND status = 'OPEN'";
+    public void updateLtp(TradeModel t, double ltp,String tableName) throws SQLException {
+        // compute pnl per unit respecting side
+        double perUnit;
+        if (t.getSide() == Signal.Side.BUY) {
+            perUnit = ltp - t.getEntryPrice();
+        } else {
+            perUnit = t.getEntryPrice() - ltp;
+        }
+        double totalPnl = perUnit * t.getQuantity();
+        double pnlPercentage = 0.0;
+        if (t.getEntryPrice() != 0) pnlPercentage = (perUnit / t.getEntryPrice()) * 100.0;
+
+        String sql = "UPDATE "+tableName+" SET ltp = ?, pnl = ?, pnl_percentage = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            double pnl = ltp - t.getEntryPrice();
             ps.setDouble(1, ltp);
-            ps.setDouble(2, pnl);
-            ps.setString(3, t.getSymbol().getSymbol());
+            ps.setDouble(2, totalPnl);
+            ps.setDouble(3, pnlPercentage);
+            ps.setString(4, t.getTradeId());
             ps.executeUpdate();
         }
     }
 
-    // -------------------- CLOSE TRADE --------------------
-    public void closeTrade(String tradeId, double exitPrice, String reason) throws SQLException {
-        String sql = "UPDATE trades SET status = 'CLOSED', exit_price = ?, exit_time = ?, Reason = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setDouble(1, exitPrice);
-            ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
-            ps.setString(3, reason);
-            ps.setString(4, tradeId);
-            ps.executeUpdate();
-        }
-    }
 
-    public void closeTradeWithPnl(TradeModel t) throws SQLException {
-        String sql = "UPDATE trades SET status = 'CLOSED', exit_price = ?, exit_time = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE status = 'OPEN' AND symbol = ?";
+    public void closeTradeWithPnl(TradeModel t, String tableName) throws SQLException {
+        String sql = "UPDATE "+tableName+" SET status = 'CLOSED', exit_price = ?, exit_time = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, t.getExitPrice());
             ps.setTimestamp(2, Timestamp.valueOf(t.getExitTime()));
             ps.setDouble(3, t.getPnl());
-            ps.setString(4, t.getSymbol().getSymbol());
+            ps.setString(4, t.getTradeId());
             ps.executeUpdate();
         }
     }
 
-    // -------------------- UPDATE QUANTITY --------------------
-    public void updateQuantity(String tradeId, int newQuantity) throws SQLException {
-        String sql = "UPDATE trades SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, newQuantity);
-            ps.setString(2, tradeId);
-            ps.executeUpdate();
-        }
-    }
-
-    // -------------------- GET TRADE BY ID --------------------
-    public Optional<TradeModel> getTradeById(String tradeId) throws SQLException {
-        String sql = "SELECT * FROM trades WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, tradeId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return Optional.of(mapRow(rs));
-                else return Optional.empty();
-            }
-        }
-    }
 
     // -------------------- LIST OPEN TRADES --------------------
-    public List<TradeModel> listOpenTrades() throws SQLException {
-        String sql = "SELECT * FROM trades WHERE status = 'OPEN'";
+    public List<TradeModel> listOpenTrades(InstrumentSymbol symbol, String timeframe, Signal signal, String tableName) throws SQLException {
+        String sql = "SELECT * FROM "+tableName+" WHERE TIMEFRAME = ?   AND orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
         List<TradeModel> tradeModels = new ArrayList<>();
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (Connection c = conn(); ) {
+            String ordertType = StringUtils.contains(timeframe, "m") ? "MIS" : "CNC";
+            PreparedStatement ps = c.prepareStatement(sql);
+            ps.setString(1,timeframe);
+            ps.setString(2,ordertType);
+            ps.setString(3,symbol.getSymbol());
+            ps.setString(4,signal.getSide().name());
+            ResultSet rs = ps.executeQuery();
             while (rs.next()) tradeModels.add(mapRow(rs));
         }
         return tradeModels;
@@ -283,6 +307,15 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         tradeModel.setPnl(rs.getDouble("pnl"));
         tradeModel.setTimeFrame(rs.getString("TIMEFRAME"));
         tradeModel.setStatus(TradeModel.Status.valueOf(rs.getString("status")));
+        // try to set LTP/pnl_percentage if present
+        try {
+            double ltp = rs.getDouble("ltp");
+            tradeModel.setLtp(ltp);
+        } catch (SQLException ignore) {}
+        try {
+            double pct = rs.getDouble("pnl_percentage");
+            tradeModel.setPnlPercentage(pct);
+        } catch (SQLException ignore) {}
         return tradeModel;
     }
 
@@ -298,7 +331,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 StrategyConfig cfg = mapper.readValue(rs.getString("json_config"), StrategyConfig.class);
                 cfg.setId(rs.getInt("id"));
                 cfg.setName(rs.getString("name"));
-                cfg.setSymbol(rs.getString("symbol"));
+                // cfg.setSymbol(rs.getString("symbol"));
                 cfg.setTimeframe(rs.getString("timeframe"));
                 strategies.add(cfg);
             }
@@ -323,36 +356,44 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             try (PreparedStatement ps = c.prepareStatement(selectSql)) {
                 ps.setString(1, symbol);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next() && rs.getString("BEST_STRATEGY") != null) {
+                    if (rs.next()) {
                         String json = rs.getString("BEST_STRATEGY");
-                        if (StringUtils.isNotEmpty(json)){
+                        if (StringUtils.isNotEmpty(json)) {
                             existing = mapper.readValue(json,
                                     mapper.getTypeFactory().constructCollectionType(List.class, StrategyResult.class));
                         }
-
                     }
                 }
             }
 
-            // === Step 2: Check if new results are better ===
             boolean shouldUpdate = false;
-            for (StrategyResult newRes : bestConfigs) {
-                for (StrategyResult oldRes : existing) {
-                    if (newRes.getName().equalsIgnoreCase(oldRes.getName())) {
-                        // Compare winRate & pnl
-                        if (newRes.getPnl() >= oldRes.getPnl() + 0.01 ||
-                                newRes.getWinRate() > oldRes.getWinRate()) {
-                            shouldUpdate = true;
-                            break;
+
+            // === Step 2: If nothing exists yet, always insert ===
+            if (existing.isEmpty()) {
+                shouldUpdate = true;
+                logger.info("📥 No existing BEST_STRATEGY for {} → inserting new strategies", symbol);
+            } else {
+                // === Step 3: Compare new results with existing ===
+                for (StrategyResult newRes : bestConfigs) {
+                    boolean matched = false;
+                    for (StrategyResult oldRes : existing) {
+                        if (newRes.getName().equalsIgnoreCase(oldRes.getName())) {
+                            matched = true;
+                            if (newRes.getPnl() >= oldRes.getPnl() + 0.01 &&
+                                    newRes.getPnl() > newRes.getDrawdown()) {
+                                shouldUpdate = true;
+                                break;
+                            }
                         }
-                    } else {
-                        // Completely new strategy – consider updating
+                    }
+                    if (!matched) {
+                        // A completely new strategy not in existing → update
                         shouldUpdate = true;
                     }
                 }
             }
 
-            // === Step 3: Persist only if improved ===
+            // === Step 4: Persist only if required ===
             if (shouldUpdate) {
                 String newJson = mapper.writeValueAsString(bestConfigs);
                 try (PreparedStatement ps = c.prepareStatement(updateSql)) {
@@ -366,6 +407,80 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             }
         } catch (Exception e) {
             logger.error("❌ Failed updating BEST_STRATEGY for {}: {}", symbol, e.getMessage(), e);
+        }
+    }
+
+    // -------------------- LIST OPEN TRADES FOR SYMBOL --------------------
+    public List<TradeModel> listOpenTradesForSymbol(String symbol,String tableName) throws SQLException {
+        String sql = "SELECT * FROM "+tableName+" WHERE status = 'OPEN' AND symbol = '"+symbol+"'";
+        List<TradeModel> tradeModels = new ArrayList<>();
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) tradeModels.add(mapRow(rs));
+        }
+        return tradeModels;
+    }
+    // --- IMPLEMENTATION ---
+
+    // WATCHLIST
+    @Override
+    public List<InstrumentSymbol> readWatchlistFromDb(String tableName) {
+        List<InstrumentSymbol> watchlist = new ArrayList<>();
+        String sql = "SELECT * FROM " + tableName;
+
+        try (Connection conn = conn();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                String symbol = rs.getString("SYMBOL");
+                String instrumentKey = rs.getString("INSTRUMENT_KEY");
+                String bestStrategy = rs.getString("BEST_STRATEGY");
+                InstrumentSymbol inst = new InstrumentSymbol(symbol, bestStrategy,
+                        GenericeConstants.NSE_EQ + instrumentKey);
+                watchlist.add(inst);
+            }
+            logger.info("Loaded {} symbols from {}", watchlist.size(), tableName);
+        } catch (SQLException e) {
+            logger.error("Failed to read watchlist from {}", tableName, e);
+        }
+        return watchlist;
+    }
+
+    // GET TRADE BY ID
+    @Override
+    public Optional<TradeModel> getTradeById(String tradeId, String tableName) throws SQLException {
+        String sql = "SELECT * FROM " + tableName + " WHERE trade_id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, tradeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return Optional.of(mapRow(rs));
+                else return Optional.empty();
+            }
+        }
+    }
+
+    // UPDATE QUANTITY
+    @Override
+    public void updateQuantity(String tradeId, int newQuantity, String tableName) throws SQLException {
+        String sql = "UPDATE " + tableName + " SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, newQuantity);
+            ps.setString(2, tradeId);
+            ps.executeUpdate();
+        }
+    }
+
+    // CLOSE TRADE
+    @Override
+    public void closeTrade(String tradeId, double exitPrice, String reason, String tableName) throws SQLException {
+        String sql = "UPDATE " + tableName + " SET status = 'CLOSED', exit_price = ?, exit_time = ?, Reason = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setDouble(1, exitPrice);
+            ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+            ps.setString(3, reason);
+            ps.setString(4, tradeId);
+            ps.executeUpdate();
         }
     }
 

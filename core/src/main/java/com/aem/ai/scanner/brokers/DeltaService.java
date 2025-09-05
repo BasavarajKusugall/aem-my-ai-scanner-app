@@ -6,11 +6,18 @@ import com.aem.ai.scanner.model.InstrumentSymbol;
 import com.aem.ai.scanner.services.HttpService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.osgi.service.component.annotations.*;
-import org.osgi.service.metatype.annotations.*;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Modified;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 @Component(service = MarketDataService.class, immediate = true)
 @Designate(ocd = DeltaService.Config.class)
@@ -20,10 +27,15 @@ public class DeltaService extends BaseService {
 
     @ObjectClassDefinition(name="BSK Delta Exchange MarketData Service")
     public @interface Config {
+        @AttributeDefinition(name = "Enable")
+        boolean enable() default true;
+
         @AttributeDefinition(name="Base URL")
         String base_url() default "https://api.india.delta.exchange";
+
         @AttributeDefinition(name="Max Retries")
         int retries() default 3;
+
         @AttributeDefinition(name="Backoff Ms")
         long backoff_ms() default 500;
     }
@@ -39,7 +51,17 @@ public class DeltaService extends BaseService {
     @Override public String brokerCode() { return "DELTA"; }
 
     @Override
+    public boolean enabled() {
+        return cfg.enable();
+    }
+
+    @Override
     public List<Candle> fetchCandles(InstrumentSymbol symbol, String timeframe, int count, boolean historical) throws Exception {
+       if (!cfg.enable()){
+           log.warn("DeltaService disabled in config");
+           return null;
+       }
+
         // Delta uses seconds epoch for start/end, resolution like 5m, 15m, 1h, 1d
         long secondsPer = secondsFor(timeframe);
         long end = Instant.now().getEpochSecond();

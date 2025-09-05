@@ -50,7 +50,7 @@ public class GeminiServiceImpl implements GeminiService {
     private String apiKey;
     private String endpoint;
     private String promptFilePath;
-    private String fundamentalAnalysisPromptFilePath;
+    private String tradeSignalAnalysisPromptFilePath;
     private String portFolioAnalysisPromptFilePath;
 
     @ObjectClassDefinition(
@@ -68,7 +68,7 @@ public class GeminiServiceImpl implements GeminiService {
         String gemini_daily_news_updates_prompt_path() default "/content/ai-scanner/ai/prompts/Morning_Update_Template.txt";
 
         @AttributeDefinition(name = "Fundament Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
-        String gemini_fundamental_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/Morning_Update_Template.txt";
+        String gemini_trade_signal_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/gemini_trade_analysis_prompt.txt";
 
         @AttributeDefinition(name = "Portfolio Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
         String gemini_portfolio_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/portfolio_analysis_template.txt";
@@ -80,7 +80,7 @@ public class GeminiServiceImpl implements GeminiService {
         this.apiKey = PropertiesUtil.toString(config.gemini_api_key(), "");
         this.endpoint = PropertiesUtil.toString(config.gemini_endpoint(), "");
         this.promptFilePath = PropertiesUtil.toString(config.gemini_daily_news_updates_prompt_path(), "");
-        this.fundamentalAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_fundamental_analysis_prompt_path(), "");
+        this.tradeSignalAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_trade_signal_analysis_prompt_path(), "");
         this.portFolioAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_portfolio_analysis_prompt_path(), "");
         log.info("GeminiService activated with endpoint: {}", this.endpoint);
     }
@@ -97,10 +97,10 @@ public class GeminiServiceImpl implements GeminiService {
         }
     }
     @Override
-    public TradeAnalysis fundamentalAnalysis(String signalMsg) throws Exception {
+    public TradeAnalysis tradeSignalAnalysis(String signalMsg) throws Exception {
         log.info("Starting Gemini fundamentalAnalysis for signal...");
 
-        HttpResponse<String> resp = getHttpResponse(signalMsg,fundamentalAnalysisPromptFilePath);
+        HttpResponse<String> resp = getHttpResponse(signalMsg, tradeSignalAnalysisPromptFilePath);
 
         if (resp.statusCode() == 200) {
             JsonNode geminiResp = mapper.readTree(resp.body());
@@ -168,7 +168,7 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String todayNewsUpdates() throws Exception {
-        HttpResponse<String> resp = getHttpResponse(StringUtils.EMPTY,fundamentalAnalysisPromptFilePath);
+        HttpResponse<String> resp = getHttpResponse(StringUtils.EMPTY, tradeSignalAnalysisPromptFilePath);
         if (resp == null) {
             throw new RuntimeException("Failed to get response from Gemini API");
         }

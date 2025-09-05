@@ -2,10 +2,8 @@ package com.aem.ai.scanner.factory.impl;
 
 
 import com.aem.ai.scanner.factory.IndicatorFactoryService;
-import com.aem.ai.scanner.factory.RuleFactoryService;
 import com.aem.ai.scanner.model.Condition;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Reference;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.indicators.EMAIndicator;

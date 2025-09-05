@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * @see <a href="https://sling.apache.org/documentation/the-sling-engine/servlets.html">Servlets and Scripts</a>
  */
 @Component(
-    service = Servlet.class,
+    service = Servlet.class, immediate = true,
     property = {
         Constants.SERVICE_DESCRIPTION + "=Hello World Path Servlet",
         Constants.SERVICE_VENDOR + "=The Apache Software Foundation",

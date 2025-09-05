@@ -63,14 +63,31 @@ public class Ta4jServiceImpl implements Ta4jService {
         log.info("Ta4jService deactivated");
     }
 
+    /**
+     * Parse timeframe strings like "5m", "15m", "1h", "1d" into Duration.
+     */
+    private static Duration parseTimeframe(String tf) {
+        if (tf == null) return Duration.ofMinutes(1);
+        tf = tf.trim().toLowerCase();
+        if (tf.endsWith("m")) {
+            return Duration.ofMinutes(Long.parseLong(tf.replace("m", "")));
+        } else if (tf.endsWith("h")) {
+            return Duration.ofHours(Long.parseLong(tf.replace("h", "")));
+        } else if (tf.endsWith("d")) {
+            return Duration.ofDays(Long.parseLong(tf.replace("d", "")));
+        }
+        return Duration.ofMinutes(1); // default
+    }
+
     @Override
-    public BarSeries buildSeries(String name, List<Candle> candles) {
+    public BarSeries buildSeries(String name, List<Candle> candles,String timeframe) {
         BarSeries series = new BaseBarSeriesBuilder().withName(name).build();
+        Duration duration = parseTimeframe(timeframe);
         for (Candle c : candles) {
             Instant time = c.getTime();
             ZonedDateTime endTime = time.atZone(ZoneId.of("UTC"));
             series.addBar(new BaseBar(
-                    Duration.ofSeconds(config.default_bar_seconds()),
+                    duration,
                     endTime,
                     series.numOf(c.getOpen()),
                     series.numOf(c.getHigh()),
