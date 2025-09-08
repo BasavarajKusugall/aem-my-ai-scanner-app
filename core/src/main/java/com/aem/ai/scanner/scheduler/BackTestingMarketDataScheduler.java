@@ -22,8 +22,6 @@ import org.ta4j.core.criteria.pnl.ReturnCriterion;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -31,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.aem.ai.scanner.model.TradeModel.IST_ZONE;
 
@@ -73,7 +72,7 @@ public class BackTestingMarketDataScheduler implements Runnable {
     @Reference
     private StrategyFactoryService strategyFactoryService;
 
-    private final List<MarketDataService> services = new ArrayList<>();
+    private final List<MarketDataService> services = new CopyOnWriteArrayList<>();
 
     @Activate
     @Modified

@@ -91,12 +91,29 @@ public class StrategyEngineImpl implements StrategyEngine {
 
                 double entryPrice = candles.get(candles.size() - 1).getClose();
                 double stopLoss = computeStopLoss(primaryRule, entryPrice, side, series);
-                double target = computeTarget(primaryRule, entryPrice, side, series);
+                double target   = computeTarget(primaryRule, entryPrice, side, series);
                 double confidence = computeConfidence(cfg, series, entryPrice, stopLoss, target);
                 double score = computeScore(entryPrice, stopLoss, target);
 
                 Signal s = new Signal(symbol, side, entryPrice, stopLoss, target, timeframe, confidence);
                 s.setScore(score);
+
+                // ✅ compute % distance from entry
+                if (!Double.isNaN(stopLoss) && entryPrice > 0) {
+                    double slPct = ((entryPrice - stopLoss) / entryPrice) * 100.0;
+                    if (side == Signal.Side.SELL) {
+                        slPct = ((stopLoss - entryPrice) / entryPrice) * 100.0;
+                    }
+                    s.setStopLossPercent(slPct);
+                }
+
+                if (!Double.isNaN(target) && entryPrice > 0) {
+                    double tpPct = ((target - entryPrice) / entryPrice) * 100.0;
+                    if (side == Signal.Side.SELL) {
+                        tpPct = ((entryPrice - target) / entryPrice) * 100.0;
+                    }
+                    s.setTargetPercent(tpPct);
+                }
                 log.info(GREEN + "[{} {}] Step 4: Entry signal generated in {} ms" + RESET,
                         symbol, cfg.getName(), (System.nanoTime() - stepStart) / 1_000_000);
                 log.info(GREEN + "[{} {}] Signal: {}" + RESET, symbol, cfg.getName(), s);
@@ -142,6 +159,14 @@ public class StrategyEngineImpl implements StrategyEngine {
         sb.append("Timeframe: ").append(timeframe).append("\n");
         sb.append("Confidence: ").append(signal.getConfidence()).append("\n");
         sb.append("Generated: ").append(ZonedDateTime.now()).append("\n");
+        if (!Double.isNaN(signal.getStopLoss())) {
+            sb.append("StopLoss: ").append(signal.getStopLoss());
+            sb.append(" (").append(String.format("%.2f", signal.getStopLossPercent())).append("%)").append("\n");
+        }
+        if (!Double.isNaN(signal.getTarget())) {
+            sb.append("Target: ").append(signal.getTarget());
+            sb.append(" (").append(String.format("%.2f", signal.getTargetPercent())).append("%)").append("\n");
+        }
         return sb.toString();
     }
 
