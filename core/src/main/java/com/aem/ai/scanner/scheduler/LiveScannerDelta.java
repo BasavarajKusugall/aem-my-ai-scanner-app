@@ -28,10 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Designate(ocd = LiveScannerDelta.Config.class)
 @Component(
         service = Runnable.class,
-        immediate = true,
-        property = {
-                "scheduler.name=LiveScannerDelta"
-        }
+        immediate = true
 )
 public class LiveScannerDelta implements Runnable {
 
@@ -161,16 +158,25 @@ public class LiveScannerDelta implements Runnable {
             tradesMonitor(symbol, candles);
 
             List<StrategyConfig> strategies = parseStrategiesCached(symbol);
+
+            // ✅ Collect signals for all strategies
+            List<LiveScannerDelta.SignalResult> results = new ArrayList<>();
             for (StrategyConfig sc : strategies) {
                 Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe);
-                opt.ifPresent(signal -> {
-                    try {
-                        handleSignal(symbol, timeframe, sc, signal);
-                    } catch (Exception e) {
-                        log.error("Signal handling failed: {}", e.getMessage(), e);
-                    }
-                });
+                opt.ifPresent(signal -> results.add(new LiveScannerDelta.SignalResult(sc, signal)));
             }
+
+            // ✅ Pick the best signal (based on your ranking logic)
+            results.stream()
+                    .max(Comparator.comparingDouble(r -> r.signal.getScore())) // Example: highest score
+                    .ifPresent(best -> {
+                        try {
+                            handleSignal(symbol, timeframe, best.strategy, best.signal);
+                            log.info("🏆 Best strategy selected: {}", best.strategy.getName());
+                        } catch (Exception e) {
+                            log.error("Signal handling failed: {}", e.getMessage(), e);
+                        }
+                    });
 
             log.info("✅ Completed {} {} (candles={}, strategies={})",
                     symbol.getSymbol(), timeframe, candles.size(), strategies.size());
@@ -294,6 +300,16 @@ public class LiveScannerDelta implements Runnable {
         CachedStrategies(String hash, List<StrategyConfig> strategies) {
             this.hash = hash;
             this.strategies = strategies;
+        }
+    }
+    // ✅ Helper class to keep strategy + signal together
+    private static class SignalResult {
+        StrategyConfig strategy;
+        Signal signal;
+
+        SignalResult(StrategyConfig strategy, Signal signal) {
+            this.strategy = strategy;
+            this.signal = signal;
         }
     }
 }

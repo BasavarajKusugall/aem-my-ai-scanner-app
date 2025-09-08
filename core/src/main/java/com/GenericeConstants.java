@@ -7,4 +7,5 @@ public class GenericeConstants {
 
     public static final String UPSTOX = "UPSTOX";
     public static final String DELTA = "DELTA";
+    public static final String CRYPTO = "CRYPTO";
 }

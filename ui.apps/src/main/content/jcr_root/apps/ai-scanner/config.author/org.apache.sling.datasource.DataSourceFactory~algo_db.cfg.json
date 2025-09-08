@@ -1,5 +1,5 @@
 {
-  "password":"",
+  "password":"Bas@1234",
   "defaultAutoCommit":"Default",
   "maxIdle:Integer":100,
   "initSQL":"",

@@ -3,6 +3,7 @@ package com.aem.ai.pm.services.impl;
 import com.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.BrokerToken;
+import com.aem.ai.pm.dto.UserBrokerAccount;
 import com.aem.ai.pm.services.BrokerTokenService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -30,19 +31,175 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
     @Override
-    public BrokerToken saveOrUpdate(BrokerToken token) {
+    public UserBrokerAccount findUserBrokerAccount(String email, String brokerName, String brokerAccountRef) {
+        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
+                GenericeConstants.MYSQL_PORTFOLIO_MGMT
+        );
+
+        if (ds == null) {
+            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        }
+
+        // Join app_user + user_broker_account + broker_token
+        String sql = "SELECT u.user_id, u.email, u.full_name, u.phone, u.status AS user_status, " +
+                "uba.account_id, uba.broker_id, uba.broker_name, uba.broker_account_ref, " +
+                "uba.account_alias, uba.base_currency, uba.status AS account_status, " +
+                "uba.api_key, uba.api_secret, uba.request_token, " +
+                "uba.telegram_bot_user_id, uba.portfolio_positions_json, uba.portfolio_holding_json, " +
+                "bt.id AS broker_token_id, bt.access_token AS token_access_token, bt.token_expiry " +
+                "FROM app_user u " +
+                "INNER JOIN user_broker_account uba ON u.user_id = uba.user_id " +
+                "INNER JOIN broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
+                "WHERE u.email=? AND uba.broker_account_ref=?";
+
+        try (Connection conn = ds.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, email);
+            ps.setString(2, brokerAccountRef);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    // hydrate UserBrokerAccount
+                    UserBrokerAccount uba = new UserBrokerAccount();
+                    uba.setAccountId(rs.getLong("account_id"));
+                    uba.setUserId(rs.getLong("user_id"));
+                    uba.setBrokerId(rs.getLong("broker_id"));
+                    uba.setBrokerName(rs.getString("broker_name"));
+                    uba.setBrokerAccountRef(rs.getString("broker_account_ref"));
+                    uba.setAccountAlias(rs.getString("account_alias"));
+                    uba.setBaseCurrency(rs.getString("base_currency"));
+                    uba.setStatus(rs.getString("account_status"));
+                    uba.setApiKey(rs.getString("api_key"));
+                    uba.setApiSecrete(rs.getString("api_secret"));
+                    uba.setRequestToken(rs.getString("request_token"));
+                    uba.setTelegramBotUserId(rs.getString("telegram_bot_user_id"));
+                    uba.setPortfolioPositionsJson(rs.getString("portfolio_positions_json"));
+                    uba.setPortfolioHoldingJson(rs.getString("portfolio_holding_json"));
+
+                    // hydrate BrokerToken if your DTO supports it
+                    BrokerToken token = new BrokerToken();
+                    token.setId(rs.getLong("broker_token_id"));
+                    token.setUserId(rs.getLong("user_id"));
+                    token.setBrokerAccountId(rs.getLong("account_id"));
+                    Timestamp ts = rs.getTimestamp("token_expiry");
+                    if (ts != null) {
+                        token.setTokenExpiry(ts.toLocalDateTime());
+                    }
+
+                    // 🔑 If you want to link the token into the account DTO
+
+                    log.info(GREEN + "✅ Found UserBrokerAccount with BrokerToken: accountId={} broker={} ref={}" + RESET,
+                            uba.getAccountId(), brokerName, brokerAccountRef);
+
+                    return uba;
+                } else {
+                    log.warn(YELLOW + "⚠️ No UserBrokerAccount found for userId={} broker={} ref={}" + RESET,
+                            email, brokerName, brokerAccountRef);
+                }
+            }
+        } catch (Exception e) {
+            log.error(RED + "❌ SQL error in findUserBrokerAccount: {}" + RESET, e.getMessage(), e);
+            throw new RuntimeException("Error finding UserBrokerAccount", e);
+        }
+
+        return null;
+    }
+
+    public BrokerToken updateAccessTokenByRef(String brokerAccountRef, String newAccessToken) {
+        log.info(BLUE + "🔄 Updating access_token for broker_account_ref={}" + RESET, brokerAccountRef);
+
+        String sql = "UPDATE broker_token bt " +
+                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+                "SET bt.access_token = ?, bt.token_expiry = NOW() " +
+                "WHERE uba.broker_account_ref = ?";
+
+        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
+                GenericeConstants.MYSQL_PORTFOLIO_MGMT
+        );
+
+        if (dataSource == null) {
+            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        }
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, newAccessToken);
+            ps.setString(2, brokerAccountRef);
+
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                conn.commit();
+                log.info(GREEN + "✅ Access token updated successfully for broker_account_ref={}" + RESET, brokerAccountRef);
+
+                // Re-fetch the updated token to return
+                return findBrokerTokenByRef(brokerAccountRef);
+            } else {
+                log.warn(YELLOW + "⚠️ No rows updated. Invalid broker_account_ref={}?" + RESET, brokerAccountRef);
+                return null;
+            }
+
+        } catch (SQLException e) {
+            log.error(RED + "❌ SQL Error in updateAccessTokenByRef: {}" + RESET, e.getMessage(), e);
+            throw new RuntimeException("Error updating access token", e);
+        }
+    }
+    /**
+     * Helper method to fetch BrokerToken by broker_account_ref.
+     */
+    private BrokerToken findBrokerTokenByRef(String brokerAccountRef) {
+        String sql = "SELECT bt.* " +
+                "FROM broker_token bt " +
+                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+                "WHERE uba.broker_account_ref = ?";
+
+        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
+                GenericeConstants.MYSQL_PORTFOLIO_MGMT
+        );
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, brokerAccountRef);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    BrokerToken token = new BrokerToken();
+                    token.setId(rs.getLong("id"));
+                    token.setUserId(rs.getLong("user_id"));
+                    token.setBrokerAccountId(rs.getLong("broker_account_id"));
+                    token.setAccessToken(rs.getString("access_token"));
+
+                    Timestamp ts = rs.getTimestamp("token_expiry");
+                    if (ts != null) {
+                        token.setTokenExpiry(ts.toLocalDateTime());
+                    }
+
+                    return token;
+                }
+            }
+        } catch (SQLException e) {
+            log.error(RED + "❌ SQL Error in findBrokerTokenByRef: {}" + RESET, e.getMessage(), e);
+        }
+
+        return null;
+    }
+
+
+
+    @Override
+    public BrokerToken saveOrUpdate(UserBrokerAccount userBrokerAccount, BrokerToken token) {
         log.info(BLUE + "🟦 Starting saveOrUpdate() for brokerAccountId={} userId={}" + RESET,
                 token.getBrokerAccountId(), token.getUserId());
 
         // Note: token_expiry is always NOW()
         String sql = "INSERT INTO broker_token " +
-                "(user_id, broker_account_id, request_token, api_key, api_secret, access_token, token_expiry) " +
-                "VALUES (?, ?, ?, ?, ?, ?, NOW()) " +
+                "(user_id, broker_account_id, access_token,broker_name, token_expiry) " +
+                "VALUES (?, ?, ?,?, NOW()) " +
                 "ON DUPLICATE KEY UPDATE " +
-                "request_token=VALUES(request_token), " +
-                "api_key=VALUES(api_key), " +
-                "api_secret=VALUES(api_secret), " +
-                "access_token=VALUES(access_token), " +
+                "broker_account_id=VALUES(broker_account_id), " +
                 "token_expiry=NOW()";
 
         DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
@@ -60,11 +217,9 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
             log.debug(CYAN + "📥 Preparing SQL Insert/Update for broker_token" + RESET);
 
             ps.setLong(1, token.getUserId());
-            ps.setLong(2, token.getBrokerAccountId());
-            ps.setString(3, token.getRequestToken());
-            ps.setString(4, token.getApiKey());
-            ps.setString(5, token.getApiSecrete());
-            ps.setString(6, token.getAccessToken());
+            ps.setLong(2, userBrokerAccount.getAccountId());
+            ps.setString(3, token.getAccessToken());
+            ps.setString(4, userBrokerAccount.getBrokerName());
 
             int rows = ps.executeUpdate();
             log.info(GREEN + "✅ saveOrUpdate executed successfully. Rows affected: {}" + RESET, rows);
@@ -81,7 +236,7 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
 
             // force token expiry in DTO also to now
             token.setTokenExpiry(java.time.LocalDateTime.now());
-
+            conn.commit();
             return token;
 
         } catch (SQLException e) {

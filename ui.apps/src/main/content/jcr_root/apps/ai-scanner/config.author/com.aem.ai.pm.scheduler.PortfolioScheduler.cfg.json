@@ -1,0 +1,5 @@
+{
+  "scheduler.expression":"0 0/50 * * * ?",
+  "enable":true,
+  "scheduler.concurrent":false
+}

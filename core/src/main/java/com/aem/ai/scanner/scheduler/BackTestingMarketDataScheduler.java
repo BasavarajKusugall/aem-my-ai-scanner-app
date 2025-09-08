@@ -22,6 +22,8 @@ import org.ta4j.core.criteria.pnl.ReturnCriterion;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -65,6 +67,8 @@ public class BackTestingMarketDataScheduler implements Runnable {
 
     @Reference
     private DAOFactory daoFactory;
+
+
 
     @Reference
     private StrategyFactoryService strategyFactoryService;

@@ -122,8 +122,13 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            if (StringUtils.containsIgnoreCase(tableName,"currency_trades")){
+                ps.setString(1, GenericeConstants.CRYPTO);
+            }else {
+                ps.setString(1, t.getSymbol().getInstrumentKey());
+            }
 
-            ps.setString(1, t.getSymbol().getInstrumentKey());
+
             ps.setString(2, t.getSymbol().getSymbol());
             ps.setString(3, t.getSide().name());
             ps.setDouble(4, t.getEntryPrice());

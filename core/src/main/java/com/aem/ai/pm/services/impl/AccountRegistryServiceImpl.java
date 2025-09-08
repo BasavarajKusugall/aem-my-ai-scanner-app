@@ -35,7 +35,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
     @Override
-    public UserBrokerAccount registerOrUpdate(UserRegistrationRequest request) {
+    public UserBrokerAccount registerOrUpdateUserBrokersAccounts(UserRegistrationRequest request) {
         UserBrokerAccount account = request.getAccount();
         BrokerToken token = request.getToken();
         if (account == null) {
@@ -50,21 +50,17 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
         );
 
         String sql = "INSERT INTO user_broker_account " +
-                "(user_id, broker_id, broker_account_ref, account_alias, base_currency, status, api_key, api_secret, request_token,broker_name) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?) " +
+                "(user_id, broker_id, broker_account_ref, account_alias, base_currency, status, api_key, api_secret, request_token, broker_name) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
-                "account_alias=VALUES(account_alias), " +
-                "base_currency=VALUES(base_currency), " +
-                "status=VALUES(status), " +
+                "broker_account_ref=VALUES(broker_account_ref), " +
                 "api_key=VALUES(api_key), " +
                 "api_secret=VALUES(api_secret), " +
-                "request_token=VALUES(request_token),"+
+                "request_token=VALUES(request_token), " +
                 "broker_name=VALUES(broker_name)";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            log.debug(CYAN + "📥 Preparing SQL Insert/Update statement for user_broker_account" + RESET);
 
             ps.setLong(1, account.getUserId());
             ps.setLong(2, account.getBrokerId());
@@ -79,15 +75,28 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
 
             int rows = ps.executeUpdate();
             log.info(GREEN + "✅ registerOrUpdate executed successfully. Rows affected: {}" + RESET, rows);
-
+            conn.commit();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     long generatedId = rs.getLong(1);
                     account.setAccountId(generatedId);
-                    conn.commit();
                     log.info(GREEN + "🆔 New AccountId generated: {}" + RESET, generatedId);
                 } else {
-                    log.debug(YELLOW + "ℹ️ No new AccountId generated (record updated instead)." + RESET);
+                    // Record already existed → fetch existing account_id
+                    String lookupSql = "SELECT account_id FROM user_broker_account WHERE user_id=? AND broker_id=?";
+                    try (PreparedStatement ps2 = conn.prepareStatement(lookupSql)) {
+                        ps2.setLong(1, account.getUserId());
+                        ps2.setLong(2, account.getBrokerId());
+                        try (ResultSet rs2 = ps2.executeQuery()) {
+                            if (rs2.next()) {
+                                long existingId = rs2.getLong("account_id");
+                                account.setAccountId(existingId);
+                                log.info(YELLOW + "ℹ️ Existing AccountId found: {}" + RESET, existingId);
+                            } else {
+                                throw new SQLException("Unable to retrieve account_id after update.");
+                            }
+                        }
+                    }
                 }
             }
 
@@ -98,6 +107,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
             throw new RuntimeException("Error saving user_broker_account", e);
         }
     }
+
 
     @Override
     public Optional<UserBrokerAccount> findById(long accountId) {

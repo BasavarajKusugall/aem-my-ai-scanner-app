@@ -11,6 +11,6 @@ import java.util.Optional;
 public interface AccountRegistryService {
     /** Return all active accounts for this broker with fresh access tokens. */
     List<BrokerAccountRef> findActiveAccounts(String brokerCode);
-    UserBrokerAccount registerOrUpdate(UserRegistrationRequest account);
+    UserBrokerAccount registerOrUpdateUserBrokersAccounts(UserRegistrationRequest account);
     Optional<UserBrokerAccount> findById(long accountId);
 }
