@@ -33,4 +33,22 @@ public @interface DhanConfig {
             description = "HTTP request timeout in milliseconds"
     )
     int timeoutMs() default 3000;
+
+    @AttributeDefinition(
+            name = "Holdings Endpoint",
+            description = "API endpoint for fetching holdings"
+    )
+    String holdingsEndpoint() default "/holdings";
+
+    @AttributeDefinition(
+            name = "Positions Endpoint",
+            description = "API endpoint for fetching positions"
+    )
+    String positionsEndpoint() default "/positions";
+
+    @AttributeDefinition(
+            name = "Funds Endpoint",
+            description = "API endpoint for fetching funds / cash summary"
+    )
+    String fundsEndpoint() default "/fundlimit";
 }

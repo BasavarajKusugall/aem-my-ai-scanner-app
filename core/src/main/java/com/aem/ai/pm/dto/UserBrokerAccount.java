@@ -17,6 +17,8 @@ public class UserBrokerAccount {
     private String telegramBotUserId;
     private String portfolioPositionsJson;
     private String portfolioHoldingJson;
+    private String password;
+
 
     // Getters and setters
     public long getAccountId() { return accountId; }
@@ -85,5 +87,36 @@ public class UserBrokerAccount {
 
     public String getPortfolioHoldingJson() {
         return portfolioHoldingJson;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    @Override
+    public String toString() {
+        return "UserBrokerAccount{" +
+                "accountId=" + accountId +
+                ", userId=" + userId +
+                ", brokerId=" + brokerId +
+                ", brokerCode='" + brokerCode + '\'' +
+                ", brokerName='" + brokerName + '\'' +
+                ", brokerAccountRef='" + brokerAccountRef + '\'' +
+                ", accountAlias='" + accountAlias + '\'' +
+                ", baseCurrency='" + baseCurrency + '\'' +
+                ", status='" + status + '\'' +
+                ", apiKey='" + apiKey + '\'' +
+                ", apiSecrete='" + apiSecrete + '\'' +
+                ", requestToken='" + requestToken + '\'' +
+                ", apiBaseUrl='" + apiBaseUrl + '\'' +
+                ", telegramBotUserId='" + telegramBotUserId + '\'' +
+                ", portfolioPositionsJson='" + portfolioPositionsJson + '\'' +
+                ", portfolioHoldingJson='" + portfolioHoldingJson + '\'' +
+                ", password='" + password + '\'' +
+                '}';
     }
 }

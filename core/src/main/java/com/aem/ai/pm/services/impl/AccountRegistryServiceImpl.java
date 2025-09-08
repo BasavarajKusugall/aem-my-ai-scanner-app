@@ -50,7 +50,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
         );
 
         String sql = "INSERT INTO user_broker_account " +
-                "(user_id, broker_id, broker_account_ref, account_alias, base_currency, status, api_key, api_secret, request_token, broker_name) " +
+                "(user_id, broker_id, broker_account_ref, account_alias, base_currency, status, api_key, api_secret, request_token, broker_name,password) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "broker_account_ref=VALUES(broker_account_ref), " +
@@ -72,6 +72,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
             ps.setString(8, token.getApiSecrete());
             ps.setString(9, token.getRequestToken());
             ps.setString(10, account.getBrokerName());
+            ps.setString(11, account.getPassword());
 
             int rows = ps.executeUpdate();
             log.info(GREEN + "✅ registerOrUpdate executed successfully. Rows affected: {}" + RESET, rows);
@@ -157,8 +158,8 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
                         "JOIN broker b ON b.broker_id = uba.broker_id " +
                         "JOIN broker_token tok ON tok.broker_account_id = uba.account_id " +
                         "WHERE b.code = ? " +
-                        "AND uba.status = 'ACTIVE' " +
-                        "AND (tok.token_expiry IS NULL OR tok.token_expiry > NOW())";
+                        "AND uba.status = 'ACTIVE' " ;
+
 
         DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
                 GenericeConstants.MYSQL_PORTFOLIO_MGMT
