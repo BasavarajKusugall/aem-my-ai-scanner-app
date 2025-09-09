@@ -3,6 +3,7 @@ package com.aem.ai.pm.connectors.kite.impl;
 import com.GenericeConstants;
 import com.aem.ai.pm.connectors.kite.KiteAuthService;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
+import com.aem.ai.pm.dto.UserBrokerAccount;
 import com.aem.ai.pm.net.HttpClientService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,50 +38,20 @@ public class KiteAuthServiceImpl implements KiteAuthService {
         return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
     }
 
-    public void refreshTokensFromBrokerAccounts() {
-        String sql = "SELECT user_id, broker_name, broker_account_ref, api_key, api_secret, request_token " +
-                "FROM user_broker_account WHERE request_token IS NOT NULL";
-
-        try (Connection con = getDataSource().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                String userId = rs.getString("user_id");
-                String brokerName = rs.getString("broker_name");
-                String brokerAccountRef = rs.getString("broker_account_ref");
-                String apiKey = rs.getString("api_key");
-                String apiSecret = rs.getString("api_secret");
-                String requestToken = rs.getString("request_token");
-
-                if (StringUtils.isNotBlank(requestToken)) {
-                    String accessToken = getAccessTokenAndStoreToken(requestToken, brokerName, brokerAccountRef, apiKey, apiSecret);
-                    if (StringUtils.isNotEmpty(accessToken)) {
-                        log.info("✅ Token refreshed for user={} broker={} account={}", userId, brokerName, brokerAccountRef);
-                    } else {
-                        log.warn("⚠️ Token refresh failed for user={} broker={} account={}", userId, brokerName, brokerAccountRef);
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            log.error("❌ Error refreshing tokens from broker_accounts", e);
-        }
-    }
 
     @Override
-    public String getAccessTokenAndStoreToken(String requestToken, String brokerName,
-                                              String brokerAccountRef, String apiKey, String apiSecret) {
+    public String getAccessTokenAndStoreToken(String requestToken, UserBrokerAccount userBrokerAccount,
+                                              String brokerAccountRef, String apiKey, String apiSecret,String brokerName) {
         try {
             // 1️⃣ Check if a valid access token exists
-            String existingToken = fetchExistingAccessToken(brokerName, brokerAccountRef);
+            String existingToken = fetchExistingAccessToken(brokerAccountRef);
             if (StringUtils.isNotEmpty(existingToken) && isAccessTokenValid(existingToken, apiKey)) {
-                log.info("✅ Using existing valid access token for broker={} / account={}", brokerName, brokerAccountRef);
+                log.info("✅ Using existing valid access token for broker={} / account={}", userBrokerAccount, brokerAccountRef);
                 return existingToken;
             }
 
             // 2️⃣ If no valid token, request new access token
-            log.info("Requesting new access token for broker={} / account={}", brokerName, brokerAccountRef);
+            log.info("Requesting new access token for broker={} / account={}", userBrokerAccount, brokerAccountRef);
 
             String url = "https://api.kite.trade/session/token";
             Map<String, String> headers = new HashMap<>();
@@ -95,18 +66,17 @@ public class KiteAuthServiceImpl implements KiteAuthService {
             String publicToken = userNode.path("public_token").asText();
             long tokenExpiry = 24 * 60 * 60;
 
-            Long brokerAccountId = getBrokerAccountId(userNode.path("user_id").asText(), brokerName, brokerAccountRef);
+            Long brokerAccountId = userBrokerAccount == null ?  getBrokerAccountId(userNode.path("user_id").asText(), brokerAccountRef) :userBrokerAccount.getAccountId();
             if (brokerAccountId == null) {
-                log.error("Broker account not found for user {} / broker {} / account {}",
-                        userNode.path("user_id").asText(), brokerName, brokerAccountRef);
+                log.error("Broker account not found for user {} /  / account {}",
+                        userNode.path("user_id").asText(),  brokerAccountRef);
                 return null;
             }
-
             // 3️⃣ Save new token in DB
-            upsertBrokerToken(brokerAccountId, String.valueOf(brokerAccountId), brokerName,
-                    accessToken, publicToken, String.valueOf(tokenExpiry));
+            upsertBrokerToken(brokerAccountId, userBrokerAccount.getUserId(), brokerName,
+                    accessToken, publicToken, String.valueOf(tokenExpiry),brokerAccountRef);
 
-            log.info("✅ New access token stored successfully for broker={} / account={}", brokerName, brokerAccountRef);
+            log.info("✅ New access token stored successfully for broker={} / account={}", userBrokerAccount, brokerAccountRef);
             return accessToken;
 
         } catch (Exception e) {
@@ -133,30 +103,29 @@ public class KiteAuthServiceImpl implements KiteAuthService {
         }
     }
 
-    private Long getBrokerAccountId(String userId, String brokerName, String brokerAccountRef) {
-        if (StringUtils.isBlank(userId)) {
-            log.error("UserId is empty, cannot fetch broker account for broker={} / account={}", brokerName, brokerAccountRef);
+    private Long getBrokerAccountId(String userId, String brokerAccountRef) {
+        if (StringUtils.isBlank(userId)|| StringUtils.isEmpty(brokerAccountRef)) {
+            log.error("brokerAccountRef is empty, cannot fetch broker account for broker={} / account={}",  brokerAccountRef);
             return null;
         }
 
         try (Connection con = getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(
                      "SELECT *\n" +
-                             "FROM user_broker_account uba" +
-                             "INNER JOIN broker_token bt" +
-                             "    ON bt.id = uba.account_id" +
-                             "WHERE bt.broker_name = ?" +
-                             "  AND uba.broker_account_ref = ?"
+                             "\t FROM user_broker_account uba \t" +
+                             "\t INNER JOIN broker_token bt \t" +
+                             "    ON bt.id = uba.account_id \t" +
+                             "WHERE \t " +
+                             "  \t uba.broker_account_ref = ?"
              )) {
-            ps.setString(1, brokerName);
-            ps.setString(2, brokerAccountRef);
+            ps.setString(1, brokerAccountRef);
 
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getLong("user_id");
-                log.warn("Broker account not found for user {} / broker {} / account {}", userId, brokerName, brokerAccountRef);
+                if (rs.next()) return rs.getLong("account_id");
+                log.warn("Broker account not found for user {} / broker {} / account {}", userId,  brokerAccountRef);
             }
         } catch (NumberFormatException nfe) {
-            log.error("Invalid userId '{}' for broker={} / account={}", userId, brokerName, brokerAccountRef, nfe);
+            log.error("Invalid userId '{}' for broker={} / account={}", userId, brokerAccountRef, nfe);
         } catch (Exception e) {
             log.error("Error fetching broker_account_id: {}", e.getMessage(), e);
         }
@@ -164,14 +133,15 @@ public class KiteAuthServiceImpl implements KiteAuthService {
     }
 
 
-    private void upsertBrokerToken(Long brokerAccountId, String userId, String brokerName,
-                                   String accessToken, String refreshToken, String tokenExpiry) {
+    private void upsertBrokerToken(Long brokerAccountId, long userId, String brokerName,
+                                   String accessToken, String refreshToken, String tokenExpiry, String brokerAccountRef) {
         try (Connection con = getDataSource().getConnection()) {
             // Create table if not exists
             String createTableSQL = "CREATE TABLE IF NOT EXISTS broker_token (" +
                     "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
                     "user_id BIGINT NOT NULL," +
                     "broker_account_id BIGINT NOT NULL," +
+                    "broker_account_ref VARCHAR(50)," +
                     "broker_name VARCHAR(50)," +
                     "access_token VARCHAR(512)," +
                     "refresh_token VARCHAR(512)," +
@@ -184,23 +154,27 @@ public class KiteAuthServiceImpl implements KiteAuthService {
 
             // Upsert token
             String upsertSQL = "INSERT INTO broker_token " +
-                    "(user_id, broker_account_id, broker_name, access_token, refresh_token, token_expiry) " +
-                    "VALUES (?, ?, ?, ?, ?, ?) " +
+                    "(user_id, broker_account_id,broker_account_ref, broker_name, access_token, refresh_token, token_expiry) " +
+                    "VALUES (?, ?,?, ?, ?, ?, ?) " +
                     "ON DUPLICATE KEY UPDATE " +
+                    "broker_account_id=VALUES(broker_account_id), " +
+                    "broker_account_ref=VALUES(broker_account_ref), " +
                     "access_token=VALUES(access_token), " +
                     "refresh_token=VALUES(refresh_token), " +
                     "token_expiry=VALUES(token_expiry), " +
                     "updated_at=CURRENT_TIMESTAMP";
 
             try (PreparedStatement ps = con.prepareStatement(upsertSQL)) {
-                ps.setLong(1, Long.parseLong(userId));
+                ps.setLong(1, userId);
                 ps.setLong(2, brokerAccountId);
-                ps.setString(3, brokerName);
-                ps.setString(4, accessToken);
-                ps.setString(5, refreshToken);
-                ps.setString(6, tokenExpiry);
+                ps.setString(3, brokerAccountRef);
+                ps.setString(4, brokerName);
+                ps.setString(5, accessToken);
+                ps.setString(6, refreshToken);
+                ps.setString(7, tokenExpiry);
                 ps.executeUpdate();
                 log.info("Broker token upserted for broker_account_id {}", brokerAccountId);
+                con.commit();
             }
 
         } catch (Exception e) {
@@ -209,16 +183,15 @@ public class KiteAuthServiceImpl implements KiteAuthService {
     }
 
     // Fetch existing access token from DB
-    private String fetchExistingAccessToken(String brokerName, String brokerAccountRef) {
+    private String fetchExistingAccessToken( String brokerAccountRef) {
         sql = "SELECT bt.access_token FROM broker_token bt " +
                 "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
-                "WHERE bt.broker_name = ? AND uba.broker_account_ref = ?";
+                "WHERE uba.broker_account_ref = ?";
         try (Connection con = getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(
                      sql
              )) {
-            ps.setString(1, brokerName);
-            ps.setString(2, brokerAccountRef);
+            ps.setString(1, brokerAccountRef);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return rs.getString("bt.access_token");
             }

@@ -72,10 +72,11 @@ public class KiteConnector implements BrokerConnector {
             // 1️⃣ Exchange request_token for access_token via KiteAuthService
             String accessToken = kiteAuthService.getAccessTokenAndStoreToken(
                     acc.requestToken,
-                    "ZERODHA",
+                    null,
                     acc.getBrokerAccountRef(),
                     acc.getApiKey(),
-                    acc.getApiSecrete()
+                    acc.getApiSecrete(),
+                    "ZERODHA"
             );
 
             if (StringUtils.isEmpty(accessToken)) {

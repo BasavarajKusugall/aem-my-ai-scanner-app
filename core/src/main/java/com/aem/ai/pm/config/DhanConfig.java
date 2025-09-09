@@ -11,6 +11,12 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 public @interface DhanConfig {
 
     @AttributeDefinition(
+            name = "Enable Dhan API",
+            description = "Enable or disable the Dhan API"
+    )
+    boolean enable() default true;
+
+    @AttributeDefinition(
             name = "Base URL",
             description = "Dhan API base URL (e.g. https://api.dhan.co/v2)"
     )
