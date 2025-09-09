@@ -29,7 +29,6 @@ buildNumber.properties
 .mtj.tmp/
 
 # Package Files #
-*.jar
 *.war
 *.nar
 *.ear
@@ -111,3 +110,4 @@ Thumbs.db
 *.bak
 *.swp
 
+merged.txt

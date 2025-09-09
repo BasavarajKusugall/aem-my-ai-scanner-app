@@ -1,6 +1,8 @@
 package com.aem.ai.pm.servlet;
 
 import com.aem.ai.pm.connectors.kite.KiteAuthService;
+import com.aem.ai.pm.dto.UserBrokerAccount;
+import com.aem.ai.pm.services.BrokerTokenService;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
@@ -26,42 +28,52 @@ public class KiteCallbackServlet extends SlingAllMethodsServlet {
     @Reference
     private KiteAuthService kiteAuthService;
 
+    @Reference
+    private BrokerTokenService brokerTokenService;
+
     @Override
     protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response) throws IOException {
         // Extract request_token and account identifiers
         String requestToken = request.getParameter("request_token");
-        String userId       = request.getParameter("user_id");
-        String brokerName   = request.getParameter("broker_name");
-        String accountNumber= request.getParameter("account_number");
+        String brokerAccountRef = request.getParameter("broker_account_ref");
 
         // Validate parameters
-        if (requestToken == null || userId == null || brokerName == null || accountNumber == null) {
+        if (requestToken == null || brokerAccountRef == null) {
             response.setStatus(400);
             response.getWriter().write("Missing required parameters");
-            log.warn("Callback missing parameters: request_token={}, user_id={}, broker_name={}, account_number={}",
-                    requestToken, userId, brokerName, accountNumber);
+            log.warn("Callback missing parameters: request_token={}, broker_account_ref={}, ",
+                    requestToken, brokerAccountRef);
+            return;
+        }
+        UserBrokerAccount userBrokerAccount = brokerTokenService.findUserBrokerAccountByBrokerAccountRef(brokerAccountRef);
+        if (null == userBrokerAccount) {
+            response.setStatus(400);
+            response.getWriter().write("Invalid broker_account_ref");
+            log.warn("Callback with invalid broker_account_ref={}", brokerAccountRef);
             return;
         }
 
-        log.info("Received request_token={} for user_id={} / broker={} / account={}",
-                requestToken, userId, brokerName, accountNumber);
+
+        log.info("Received request_token={} for broker_account_ref={} ",
+                requestToken, brokerAccountRef);
 
         // Option 1: Pass apiKey and apiSecret directly (if known here)
-        String apiKey    = request.getParameter("api_key");    // Optional: from request param
-        String apiSecret = request.getParameter("api_secret"); // Optional: from request param
+        String apiKey    = userBrokerAccount.getApiKey();    // Optional: from request param
+        String apiSecret = userBrokerAccount.getApiSecrete(); // Optional: from request param
 
         // Option 2: If apiKey/apiSecret stored in broker_accounts, KiteAuthService can fetch internally
 
         // Exchange request_token for access_token and store in DB
         String success = kiteAuthService.getAccessTokenAndStoreToken(
                 requestToken,
-                brokerName,
-                accountNumber,
+                userBrokerAccount,
+                brokerAccountRef,
                 apiKey,        // pass null if KiteAuthService handles fetching from DB
-                apiSecret      // pass null if KiteAuthService handles fetching from DB
+                apiSecret ,
+                "ZERODHA"// pass null if KiteAuthService handles fetching from DB
         );
 
         // Respond
-        response.getWriter().write(success);
+        response.getWriter().write("{\"status\":\"success\",\"message\":\"Token updated\"}");
     }
 }

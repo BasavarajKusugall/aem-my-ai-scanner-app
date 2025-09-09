@@ -1,6 +1,7 @@
 package com.aem.ai.pm.services.impl;
 
 import com.aem.ai.pm.dto.AppUser;
+import com.aem.ai.pm.dto.BrokerToken;
 import com.aem.ai.pm.dto.UserBrokerAccount;
 import com.aem.ai.pm.dto.UserRegistrationRequest;
 import com.aem.ai.pm.services.AccountRegistryService;
@@ -50,25 +51,24 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
 
             // Register or update account
             userBrokerAccount.setUserId(user.getUserId());
-            UserBrokerAccount savedAccount = accountService.registerOrUpdate(request);
+            UserBrokerAccount savedAccount = accountService.registerOrUpdateUserBrokersAccounts(request);
             log.info(GREEN + "💼 Account registered/updated successfully. accountId={} for userId={}" + RESET,
                     savedAccount.getAccountId(), user.getUserId());
 
             // Register token if present
-         /*   if (request.getToken() != null) {
+            if (request.getToken() != null) {
                 BrokerToken token = request.getToken();
                 token.setUserId(user.getUserId());
                 token.setBrokerAccountId(savedAccount.getAccountId());
-                token.setAccessToken(null); // always null at registration
                 log.info(CYAN + "🔑 Token provided in request. Preparing to save for accountId={}..." + RESET,
                         savedAccount.getAccountId());
 
                 // Uncomment when token saving is enabled
-                // tokenService.saveOrUpdate(token);
+                 tokenService.saveOrUpdate(savedAccount,token);
                 log.debug(YELLOW + "⚠️ Token saving is currently commented out (disabled)." + RESET);
             } else {
                 log.warn(YELLOW + "⚠️ No token provided in registration request. Skipping token save." + RESET);
-            }*/
+            }
 
             log.info(GREEN + "✅ Registration process completed successfully for userId={} accountId={}" + RESET,
                     user.getUserId(), savedAccount.getAccountId());

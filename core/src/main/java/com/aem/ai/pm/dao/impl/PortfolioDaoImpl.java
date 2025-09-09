@@ -84,8 +84,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
         try (PreparedStatement ps = c.prepareStatement(
                 "UPDATE user_broker_account " +
                         "SET portfolio_holding_json = ?, " +
-                        "    portfolio_positions_json = ?, " +
-                        "    updated_at = NOW() " +
+                        "    portfolio_positions_json = ? " +
                         "WHERE broker_account_ref = ?")) {
 
             // Serialize holdings and positions

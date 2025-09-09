@@ -131,4 +131,48 @@ public class UserServiceImpl implements UserService {
 
         return Optional.empty();
     }
+
+    @Override
+    public Optional<AppUser> findByIdOrEmail(String idOrEmail) {
+        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        if (ds == null) {
+            log.error("❌ DataSource not available for UserService");
+            return Optional.empty();
+        }
+
+        String sql;
+        boolean isNumeric = idOrEmail.matches("\\d+");
+        if (isNumeric) {
+            sql = "SELECT user_id, email, full_name, phone, status " +
+                    "FROM app_user WHERE user_id = ?";
+        } else {
+            sql = "SELECT user_id, email, full_name, phone, status " +
+                    "FROM app_user WHERE email = ?";
+        }
+
+        try (Connection con = ds.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            if (isNumeric) {
+                ps.setLong(1, Long.parseLong(idOrEmail));
+            } else {
+                ps.setString(1, idOrEmail);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    AppUser u = new AppUser();
+                    u.setUserId(rs.getLong("user_id"));
+                    u.setEmail(rs.getString("email"));
+                    u.setFullName(rs.getString("full_name"));
+                    u.setPhone(rs.getString("phone"));
+                    u.setStatus(rs.getString("status"));
+                    return Optional.of(u);
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Error in findByIdOrEmail: {}", e.getMessage(), e);
+        }
+        return Optional.empty();
+    }
 }

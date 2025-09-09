@@ -9,6 +9,21 @@ import java.util.UUID;
  */
 public class Signal {
     private double score;
+    private double stopLossPercent;
+    private double targetPercent;
+
+    public double getStopLossPercent() {
+        return stopLossPercent;
+    }
+    public void setStopLossPercent(double stopLossPercent) {
+        this.stopLossPercent = stopLossPercent;
+    }
+    public double getTargetPercent() {
+        return targetPercent;
+    }
+    public void setTargetPercent(double targetPercent) {
+        this.targetPercent = targetPercent;
+    }
 
     public double getScore() {
         return score;
