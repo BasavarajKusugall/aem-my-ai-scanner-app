@@ -1,10 +1,7 @@
 package com.aem.ai.scanner.services.impl;
 
 import com.aem.ai.scanner.factory.StrategyFactoryService;
-import com.aem.ai.scanner.model.Candle;
-import com.aem.ai.scanner.model.InstrumentSymbol;
-import com.aem.ai.scanner.model.Signal;
-import com.aem.ai.scanner.model.StrategyConfig;
+import com.aem.ai.scanner.model.*;
 import com.aem.ai.scanner.services.StrategyEngine;
 import com.aem.ai.scanner.services.Ta4jService;
 import org.osgi.service.component.annotations.Component;
@@ -90,8 +87,19 @@ public class StrategyEngineImpl implements StrategyEngine {
                 }
 
                 double entryPrice = candles.get(candles.size() - 1).getClose();
-                double stopLoss = computeStopLoss(primaryRule, entryPrice, side, series);
-                double target   = computeTarget(primaryRule, entryPrice, side, series);
+                boolean isBuy = true; // or false for short
+
+                double[] sltp = StopLossTargetCalculator.computeSLTP(series,
+                        14,   // ATR period
+                        10,   // Swing lookback
+                        1.0,  // ATR buffer
+                        entryPrice,
+                        isBuy);
+
+                double stopLoss = sltp[0];
+                double target   = sltp[1];
+               /* double stopLoss = computeStopLoss(primaryRule, entryPrice, side, series);
+                double target   = computeTarget(primaryRule, entryPrice, side, series);*/
                 double confidence = computeConfidence(cfg, series, entryPrice, stopLoss, target);
                 double score = computeScore(entryPrice, stopLoss, target);
 
