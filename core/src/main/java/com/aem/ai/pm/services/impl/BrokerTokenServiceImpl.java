@@ -31,6 +31,65 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
     @Override
+    public UserBrokerAccount findUserBrokerAccountByBrokerAccountRef( String brokerAccountRef) {
+        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
+                GenericeConstants.MYSQL_PORTFOLIO_MGMT
+        );
+
+        if (ds == null) {
+            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
+        }
+
+        // Join app_user + user_broker_account + broker_token
+        String sql = "SELECT u.user_id, u.email, u.full_name, u.phone, u.status AS user_status, " +
+                "uba.account_id, uba.broker_id, uba.broker_name, uba.broker_account_ref, " +
+                "uba.account_alias, uba.base_currency, uba.status AS account_status, " +
+                "uba.api_key, uba.api_secret, uba.request_token, " +
+                "uba.telegram_bot_user_id, uba.portfolio_positions_json, uba.portfolio_holding_json, " +
+                "bt.id AS broker_token_id, bt.access_token AS token_access_token, bt.token_expiry " +
+                "FROM app_user u " +
+                "INNER JOIN user_broker_account uba ON u.user_id = uba.user_id " +
+                "INNER JOIN broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
+                "WHERE uba.broker_account_ref=?";
+
+        try (Connection conn = ds.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, brokerAccountRef);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    // hydrate UserBrokerAccount
+                    UserBrokerAccount uba = new UserBrokerAccount();
+                    uba.setAccountId(rs.getLong("account_id"));
+                    uba.setBrokerName(rs.getString("broker_name"));
+                    uba.setUserId(rs.getLong("user_id"));
+                    uba.setBrokerAccountRef(rs.getString("broker_account_ref"));
+                    uba.setStatus(rs.getString("account_status"));
+                    uba.setApiKey(rs.getString("api_key"));
+                    uba.setApiSecrete(rs.getString("api_secret"));
+                    uba.setRequestToken(rs.getString("request_token"));
+
+
+                    log.info(GREEN + "✅ Found UserBrokerAccount with BrokerToken: accountId={} broker_account_ref={}" + RESET,
+                            uba.getAccountId(),  brokerAccountRef);
+
+                    return uba;
+                } else {
+                    log.warn(YELLOW + "⚠️ No UserBrokerAccount found for broker_account_ref={} " + RESET,
+                           brokerAccountRef);
+                }
+            }
+        } catch (Exception e) {
+            log.error(RED + "❌ SQL error in findUserBrokerAccount: {}" + RESET, e.getMessage(), e);
+            throw new RuntimeException("Error finding UserBrokerAccount", e);
+        }
+
+        return null;
+    }
+
+    @Override
     public UserBrokerAccount findUserBrokerAccount(String email, String brokerName, String brokerAccountRef) {
         DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
                 GenericeConstants.MYSQL_PORTFOLIO_MGMT
@@ -150,8 +209,8 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
     /**
      * Helper method to fetch BrokerToken by broker_account_ref.
      */
-    private BrokerToken findBrokerTokenByRef(String brokerAccountRef) {
-        String sql = "SELECT bt.* " +
+    public BrokerToken findBrokerTokenByRef(String brokerAccountRef) {
+        String sql = "SELECT * " +
                 "FROM broker_token bt " +
                 "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
                 "WHERE uba.broker_account_ref = ?";
