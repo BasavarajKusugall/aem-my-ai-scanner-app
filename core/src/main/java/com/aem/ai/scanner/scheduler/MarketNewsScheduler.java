@@ -37,7 +37,8 @@ public class MarketNewsScheduler implements Runnable {
         @AttributeDefinition(name = "Cron expression",
                 description = "CRON format, default: every 5 minutes")
         String scheduler_expression() default "0 9,14,18 * * * ?";
-
+        @AttributeDefinition(name = "Misfire Policy", description = "Reschedule on misfire")
+        String scheduler_misfire_policy() default "REPLACE";
 
 
         @AttributeDefinition(name = "Allow concurrent execution")

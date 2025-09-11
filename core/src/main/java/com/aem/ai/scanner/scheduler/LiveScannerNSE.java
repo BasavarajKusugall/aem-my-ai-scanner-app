@@ -13,6 +13,7 @@ import com.aem.ai.scanner.utils.Utils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
@@ -48,6 +49,9 @@ public class LiveScannerNSE implements Runnable {
 
         @AttributeDefinition(name = "Allow concurrent execution")
         boolean scheduler_concurrent() default false;
+
+        @AttributeDefinition(name = "Misfire Policy", description = "Reschedule on misfire")
+        String scheduler_misfire_policy() default "REPLACE";
 
         @AttributeDefinition(name = "Scheduler name")
         String scheduler_name() default "LiveScannerNSE";
@@ -120,9 +124,25 @@ public class LiveScannerNSE implements Runnable {
     protected void deactivate() {
         log.info("🛑 LiveScannerNSE deactivated.");
     }
+    private static final String SCHEDULER_KEY = "LiveScannerNSE";
 
     @Override
     public void run() {
+        try {
+            log.info("💡 LiveScannerNSE scheduler triggered at {}", LocalDateTime.now());
+            doRun(); // move your original run() logic into doRun()
+            // reset scheduler-level failures on success
+            AtomicInteger ai = consecutiveFailures.get(SCHEDULER_KEY);
+            if (ai != null) ai.set(0);
+        } catch (Throwable t) {
+            // Catch everything so Sling doesn't unschedule the job
+            log.error("❌ Unhandled error in LiveScannerNSE scheduler (kept alive): {}", t.getMessage(), t);
+            consecutiveFailures.computeIfAbsent(SCHEDULER_KEY, k -> new AtomicInteger()).incrementAndGet();
+            // do NOT rethrow
+        }
+    }
+
+    private void doRun() {
         if (config == null || !config.enable()) {
             log.debug("Scheduler disabled");
             return;
@@ -156,7 +176,8 @@ public class LiveScannerNSE implements Runnable {
     private void fetchAndProcess(MarketDataService svc, InstrumentSymbol symbol,
                                  String timeframe, int count, int attempt) {
         try {
-            List<Candle> candles = svc.fetchCandles(symbol, timeframe, count, false);
+            final boolean historical = Timeframes.isHistoricalBucket(timeframe);
+            List<Candle> candles = svc.fetchCandles(symbol, timeframe, count, historical);
             if (candles == null || candles.isEmpty()) {
                 throw new RuntimeException("No candles returned");
             }
@@ -177,6 +198,10 @@ public class LiveScannerNSE implements Runnable {
                     .max(Comparator.comparingDouble(r -> r.signal.getScore())) // Example: highest score
                     .ifPresent(best -> {
                         try {
+                            log.info("Best signal for {} {}: {} (score={})",
+                                    symbol.getSymbol(), timeframe, best.signal.getSide(), best.signal.getScore());
+                            log.info("\n ********* Signal details: entry={}, sl={}, target={}  ******\n",
+                                    best.signal.getEntryPrice(), best.signal.getStopLoss(), best.signal.getTarget());
                             handleSignal(symbol, timeframe, best.strategy, best.signal);
                             log.info("🏆 Best strategy selected: {}", best.strategy.getName());
                         } catch (Exception e) {
@@ -268,7 +293,7 @@ public class LiveScannerNSE implements Runnable {
 
     private void handleSignal(InstrumentSymbol symbol, String timeframe, StrategyConfig sc, Signal signal) throws Exception {
         String msg = strategyEngine.format(signal, sc, symbol, timeframe);
-        telegram.sendMessageDailyStocksAlerts(msg);
+
 
         if (signal.getSide() == Signal.Side.BUY) {
             onEntrySignal(symbol, timeframe, sc, signal, msg);
@@ -281,12 +306,12 @@ public class LiveScannerNSE implements Runnable {
                                String timeframe,
                                StrategyConfig sc,
                                Signal signal,
-                               String comment) throws Exception {
+                               String signalMsg) throws Exception {
 
         List<TradeModel> openTrades = daoFactory.listOpenTrades(symbol, timeframe, signal, config.trades_table());
         if (!openTrades.isEmpty()) {
-            daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
-            log.info("🔔 Comment appended to existing open trade: {} - {}", symbol.getSymbol(), comment);
+            daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
+            log.info("🔔 Comment appended to existing open trade: {} - {}", symbol.getSymbol(), signalMsg);
             return;
         }
 
@@ -297,17 +322,22 @@ public class LiveScannerNSE implements Runnable {
         trade.setStatus(TradeModel.Status.OPEN);
         trade.setTimeFrame(timeframe);
 
+        if (!trade.isValid()) {
+            log.warn("Trade is invalid: {}", trade);
+            return;
+        }
         // Generate trade analysis
         TradeAnalysis tradeAnalysis = geminiService.tradeSignalAnalysis(
-                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment)
+                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg)
         );
+        telegram.sendMessageDailyStocksAlerts(signalMsg);
 
         // Insert trade into database
         daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table());
-        daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
+        daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
 
         // Log beautifully formatted signal
-        log.info("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment));
+        log.info("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg));
     }
 
     /**
@@ -316,7 +346,7 @@ public class LiveScannerNSE implements Runnable {
 
 
 
-    private void onExitSignal(InstrumentSymbol symbol, String timeframe, StrategyConfig sc, Signal signal, String comment) throws Exception {
+    private void onExitSignal(InstrumentSymbol symbol, String timeframe, StrategyConfig sc, Signal signal, String signalMsg) throws Exception {
         List<TradeModel> openTrades = daoFactory.listOpenTrades(symbol, timeframe, signal, config.trades_table());
         if (openTrades.isEmpty()) return;
 
@@ -327,9 +357,9 @@ public class LiveScannerNSE implements Runnable {
                 ? (t.getExitPrice() - t.getEntryPrice())
                 : (t.getEntryPrice() - t.getExitPrice());
         t.setPnl(pnl);
-
+        telegram.sendMessageDailyStocksAlerts(signalMsg);
         daoFactory.closeTradeWithPnl(t, config.trades_table());
-        daoFactory.appendOpenTradeComment(symbol, t.getSide(), "[CLOSED] " + comment, config.trades_table());
+        daoFactory.appendOpenTradeComment(symbol, t.getSide(), "[CLOSED] " + signalMsg, config.trades_table());
     }
 
     private static class CachedStrategies {

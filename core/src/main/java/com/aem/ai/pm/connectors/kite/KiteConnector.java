@@ -76,7 +76,8 @@ public class KiteConnector implements BrokerConnector {
                     acc.getBrokerAccountRef(),
                     acc.getApiKey(),
                     acc.getApiSecrete(),
-                    "ZERODHA"
+                    "ZERODHA",
+                    acc.getUserId()
             );
 
             if (StringUtils.isEmpty(accessToken)) {
@@ -91,17 +92,17 @@ public class KiteConnector implements BrokerConnector {
             headers.put("X-Kite-Version", "3");
             headers.put("Authorization", "token " + acc.getApiKey() + ":" + accessToken);
 
-            String holdingsJson = http.get(cfg.baseUrl() + "/portfolio/holdings", headers,1000);
+            String holdingsJson = http.get(cfg.baseUrl() + cfg.holdingsEndpoint(), headers,1000);
             List<HoldingItem> holdings = mapKiteHoldings(holdingsJson);
             log.info(GREEN + "✅ Holdings fetched: {} instruments" + RESET, holdings.size());
 
 // 3️⃣ Fetch positions via REST
-            String positionsJson = http.get(cfg.baseUrl() + "/portfolio/positions", headers,1000);
+            String positionsJson = http.get(cfg.baseUrl() + cfg.positionsEndpoint(), headers,1000);
             List<PositionItem> positions = mapKitePositions(positionsJson);
             log.info(GREEN + "✅ Positions fetched: {} items" + RESET, positions.size());
 
 // 4️⃣ Fetch margins/funds via REST
-            String marginJson = http.get(cfg.baseUrl() + "/portfolio/margins/equity", headers,1000);
+            String marginJson = http.get(cfg.baseUrl() + cfg.fundsEndpoint(), headers,1000);
             CashSummary cash = mapKiteFunds(marginJson);
             log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
 

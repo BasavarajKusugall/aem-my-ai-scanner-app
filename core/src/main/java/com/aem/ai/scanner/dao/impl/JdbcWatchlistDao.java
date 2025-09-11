@@ -75,7 +75,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
 
     private List<InstrumentSymbol> read(String table, String type) {
         List<InstrumentSymbol> watchlist = new ArrayList<>();
-        String sql = "SELECT * FROM " + table;
+        String sql = "SELECT * FROM " + table +" WHERE BEST_STRATEGY IS NOT NULL";
 
         DataSource dataSource = getDataSource();
         if (dataSource == null) {

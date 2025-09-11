@@ -6,6 +6,7 @@ import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.dao.WatchlistDao;
 import com.aem.ai.scanner.factory.StrategyFactoryService;
 import com.aem.ai.scanner.model.*;
+import com.aem.ai.scanner.services.ReportStorageService;
 import com.aem.ai.scanner.utils.RollingBarSeries;
 import com.aem.ai.scanner.utils.Timeframes;
 import org.osgi.service.component.annotations.*;
@@ -16,19 +17,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ta4j.core.*;
 import org.ta4j.core.Bar;
-import org.ta4j.core.backtest.BarSeriesManager;
-import org.ta4j.core.criteria.MaximumDrawdownCriterion;
-import org.ta4j.core.criteria.pnl.ReturnCriterion;
+import org.ta4j.core.backtest.BacktestExecutor;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
+import org.ta4j.core.reports.PerformanceReport;
+import org.ta4j.core.reports.PositionStatsReport;
+import org.ta4j.core.reports.TradingStatement;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.aem.ai.scanner.model.TradeModel.IST_ZONE;
@@ -49,12 +48,16 @@ public class BackTestingMarketDataScheduler implements Runnable {
         boolean enable() default true;
 
         @AttributeDefinition(name="Cron expression")
-        String scheduler_expression() default "0 0/5 * * * ?";
+        String scheduler_expression() default "0 0/50 * * * ?";
         @AttributeDefinition(name = "Allow concurrent execution")
         boolean scheduler_concurrent() default false;
 
+        @AttributeDefinition(name = "Misfire Policy", description = "Reschedule on misfire")
+        String scheduler_misfire_policy() default "REPLACE";
+
         @AttributeDefinition(name = "Scheduler name")
         String scheduler_name() default "BackTestingMarketDataScheduler";
+
         @AttributeDefinition(name="Timeframes e.g. 5m:120,15m:64,1h:48,1d:365")
         String timeframes() default "5m:120,15m:64,1h:48,1d:365";
     }
@@ -71,6 +74,9 @@ public class BackTestingMarketDataScheduler implements Runnable {
 
     @Reference
     private StrategyFactoryService strategyFactoryService;
+
+    @Reference
+    private ReportStorageService reportStorageService;
 
     private final List<MarketDataService> services = new CopyOnWriteArrayList<>();
 
@@ -168,39 +174,162 @@ public class BackTestingMarketDataScheduler implements Runnable {
             return;
         }
 
-        List<StrategyResult> results = new ArrayList<>();
-        for (StrategyConfig strategyTemplate : strategyConfigs) {
-            List<StrategyConfig> variations = generateVariations(strategyTemplate);
-            for (StrategyConfig dynamicStrategy : variations) {
+        // Collect all strategies (including variations)
+        List<Strategy> strategies = new ArrayList<>();
+        List<StrategyConfig> strategyMapping = new ArrayList<>(); // parallel mapping for persistence
+
+        for (StrategyConfig template : strategyConfigs) {
+            template.setTimeframe(timeframe);
+            List<StrategyConfig> variations = generateVariations(template, series, timeframe);
+
+            for (StrategyConfig cfg : variations) {
                 try {
-                    Strategy strategy = strategyFactoryService.buildStrategy(dynamicStrategy, series);
-                    BarSeriesManager mgr = new BarSeriesManager(series);
-                    TradingRecord record = mgr.run(strategy);
-
-                    double winRate = computeWinRate(series, record);
-                    double pnl     = new ReturnCriterion().calculate(series, record).doubleValue();
-                    double dd      = new MaximumDrawdownCriterion().calculate(series, record).doubleValue();
-
-                    results.add(new StrategyResult(dynamicStrategy, winRate, pnl, dd));
-                    log.info("📊 Strategy {} -> WinRate={} PnL={} MaxDD={}",
-                            dynamicStrategy.getName(), winRate, pnl, dd);
+                    Strategy s = strategyFactoryService.buildStrategy(cfg, series);
+                    strategies.add(s);
+                    strategyMapping.add(cfg);
                 } catch (Exception e) {
-                    log.error("❌ Error evaluating strategy {}: {}", dynamicStrategy.getName(), e.getMessage(), e);
+                    log.error("❌ Error building strategy {}: {}", cfg.getName(), e.getMessage(), e);
                 }
             }
         }
 
-        List<StrategyResult> topResults = results.stream()
-                .sorted(Comparator.comparingDouble(StrategyResult::getPnl).reversed())
-                .limit(3)
-                .toList();
+        if (strategies.isEmpty()) {
+            log.warn("⚠️ No valid strategies to test.");
+            return;
+        }
 
+        // ✅ Use BacktestExecutor instead of BarSeriesManager
+        BacktestExecutor executor = new BacktestExecutor(series);
+        List<TradingStatement> tradingStatements = executor.execute(
+                strategies,
+                DecimalNum.valueOf(50), // position size (adjust as needed)
+                Trade.TradeType.BUY
+        );
+
+        // ✅ Convert results into StrategyResult
+        List<StrategyResult> results = new ArrayList<>();
+        for (int i = 0; i < tradingStatements.size(); i++) {
+            TradingStatement ts = tradingStatements.get(i);
+            StrategyConfig cfg = strategyMapping.get(i);
+
+            double pnl = ts.getPerformanceReport().getTotalProfitLossPercentage().doubleValue();
+            double winRate = (ts.getPositionStatsReport().getProfitCount().intValue() == 0)
+                    ? 0.0
+                    : (double) ts.getPositionStatsReport().getProfitCount().intValue()
+                    / (ts.getPositionStatsReport().getProfitCount().intValue() + ts.getPositionStatsReport().getLossCount().intValue());
+// assuming 'record' is the TradingRecord returned by mgr.run(strategy)
+            double dd = 0.0;
+            if (pnl > 1 && ts.getPositionStatsReport().getProfitCount().intValue() > ts.getPositionStatsReport().getLossCount().intValue() ){
+                results.add(new StrategyResult(cfg, winRate, pnl, dd));
+            }
+        }
+
+        // ✅ Store reports
+        try {
+            BacktestReportGenerator reportGen = new BacktestReportGenerator(tradingStatements);
+
+            reportStorageService.storeReport(
+                    "/var/mytrades",
+                    symbol.getSymbol() + "_" + timeframe + ".csv",
+                    reportGen.generateCsv(),
+                    "text/csv"
+            );
+
+            reportStorageService.storeReport(
+                    "/var/mytrades",
+                    symbol.getSymbol() + "_" + timeframe + ".json",
+                    reportGen.generateJson(),
+                    "application/json"
+            );
+
+            reportStorageService.storeReport(
+                    "/var/mytrades",
+                    symbol.getSymbol() + "_" + timeframe + ".html",
+                    reportGen.generateHtml(),
+                    "text/html"
+            );
+
+            log.info("✅ Reports stored in CRX for {} {}", symbol, timeframe);
+        } catch (Exception e) {
+            log.error("❌ Failed to store reports for {} {}: {}", symbol, timeframe, e.getMessage(), e);
+        }
+
+        // ✅ Still print summary to logs
+
+        // ✅ Print reports
+        log.info(printReport(tradingStatements));
+
+        // ✅ Best strategy summary
+        Optional<TradingStatement> bestStatement = tradingStatements.stream()
+                .max(Comparator.comparing(ts -> ts.getPerformanceReport().getTotalProfitLossPercentage()));
+
+        if (bestStatement.isPresent()) {
+            TradingStatement best = bestStatement.get();
+            log.info("\n\n========= BEST STRATEGY SUMMARY =========");
+            log.info("Name: {}", best.getStrategy().getName());
+            log.info("Total Profit: {}", best.getPerformanceReport().getTotalProfit());
+            log.info("Total P/L %: {}", best.getPerformanceReport().getTotalProfitLossPercentage());
+            log.info("Profitable Trades: {}", best.getPositionStatsReport().getProfitCount());
+            log.info("Losing Trades: {}", best.getPositionStatsReport().getLossCount());
+            log.info("Break-even Trades: {}", best.getPositionStatsReport().getBreakEvenCount());
+            log.info("=========================================");
+        }
+
+        // ✅ Persist results
         String watchListTable = GenericeConstants.DELTA.equalsIgnoreCase(brokerCode)
                 ? watchlistDao.deltaTable()
                 : watchlistDao.upstoxTable();
-
-        daoFactory.persistBestStrategies(watchListTable, symbol.getSymbol(), topResults);
+        daoFactory.persistBestStrategies(watchListTable, symbol.getSymbol(), results);
     }
+
+
+    /** ========= Helper reporting methods ========= */
+
+    private static String printReport(List<TradingStatement> tradingStatements) {
+        StringJoiner resultJoiner = new StringJoiner(System.lineSeparator());
+        for (TradingStatement statement : tradingStatements) {
+            resultJoiner.add(printStatementReport(statement).toString());
+        }
+        return resultJoiner.toString();
+    }
+
+    private static StringBuilder printStatementReport(TradingStatement statement) {
+        StringBuilder resultBuilder = new StringBuilder();
+        resultBuilder.append("\n######### ")
+                .append(statement.getStrategy().getName())
+                .append(" #########")
+                .append(System.lineSeparator())
+                .append(printPerformanceReport(statement.getPerformanceReport()))
+                .append(System.lineSeparator())
+                .append(printPositionStats(statement.getPositionStatsReport()))
+                .append(System.lineSeparator())
+                .append("###########################");
+        return resultBuilder;
+    }
+
+    private static StringBuilder printPerformanceReport(PerformanceReport report) {
+        StringBuilder resultBuilder = new StringBuilder();
+        resultBuilder.append("--------- performance report ---------")
+                .append(System.lineSeparator())
+                .append("total loss: ").append(report.getTotalLoss()).append(System.lineSeparator())
+                .append("total profit: ").append(report.getTotalProfit()).append(System.lineSeparator())
+                .append("total profit loss: ").append(report.getTotalProfitLoss()).append(System.lineSeparator())
+                .append("total profit loss percentage: ").append(report.getTotalProfitLossPercentage()).append(System.lineSeparator())
+                .append("---------------------------");
+        return resultBuilder;
+    }
+
+    private static StringBuilder printPositionStats(PositionStatsReport report) {
+        StringBuilder resultBuilder = new StringBuilder();
+        resultBuilder.append("--------- trade statistics report ---------")
+                .append(System.lineSeparator())
+                .append("loss trade count: ").append(report.getLossCount()).append(System.lineSeparator())
+                .append("profit trade count: ").append(report.getProfitCount()).append(System.lineSeparator())
+                .append("break even trade count: ").append(report.getBreakEvenCount()).append(System.lineSeparator())
+                .append("---------------------------");
+        return resultBuilder;
+    }
+
 
     /** Map timeframe string to Duration */
     private static Duration mapTimeframe(String tf) {
@@ -247,25 +376,85 @@ public class BackTestingMarketDataScheduler implements Runnable {
         return (double) wins / record.getTrades().size();
     }
 
-    private List<StrategyConfig> generateVariations(StrategyConfig cfg) {
+    /**
+     * Convert a timeframe string like "5m", "1h", "1d" into minutes
+     */
+    private static int timeframeToMinutes(String tf) {
+        if (tf == null || tf.isEmpty()) throw new IllegalArgumentException("Timeframe cannot be null or empty");
+
+        tf = tf.trim().toLowerCase();
+        int multiplier;
+        if (tf.endsWith("m")) {
+            multiplier = 1;
+        } else if (tf.endsWith("h")) {
+            multiplier = 60;
+        } else if (tf.endsWith("d")) {
+            multiplier = 1440; // 24 * 60
+        } else {
+            throw new IllegalArgumentException("Unsupported timeframe: " + tf);
+        }
+
+        String numberPart = tf.substring(0, tf.length() - 1);
+        int value = Integer.parseInt(numberPart);
+        return value * multiplier;
+    }
+    private List<StrategyConfig> generateVariations(StrategyConfig cfg, BarSeries series, String timeframe) {
         List<StrategyConfig> list = new ArrayList<>();
+        int minutes = timeframeToMinutes(timeframe);
+
+        // Determine the timeframe from the series
+        Duration tfDuration = series.getBar(0).getTimePeriod();
+        //int minutes = (int) tfDuration.toMinutes();
+
+        // Define ranges dynamically based on timeframe
+        int[] emaFastRange;
+        int[] emaSlowRange;
+        int[] rsiPeriods;
+        int[] macdFastRange;
+        int[] macdSlowRange;
+        int[] macdSignalRange;
+
+        if (minutes <= 5) { // very short-term
+            emaFastRange = new int[]{3,5,8};
+            emaSlowRange = new int[]{13,21,34};
+            rsiPeriods = new int[]{5,7,9};
+            macdFastRange = new int[]{5,8,10};
+            macdSlowRange = new int[]{13,21,26};
+            macdSignalRange = new int[]{5,7,9};
+        } else if (minutes <= 15) { // short-term
+            emaFastRange = new int[]{5,9,12};
+            emaSlowRange = new int[]{21,26,50};
+            rsiPeriods = new int[]{7,14,21};
+            macdFastRange = new int[]{10,12,15};
+            macdSlowRange = new int[]{20,26,30};
+            macdSignalRange = new int[]{7,9,12};
+        } else { // longer-term (1h, 1d)
+            emaFastRange = new int[]{10,15,20};
+            emaSlowRange = new int[]{50,60,100};
+            rsiPeriods = new int[]{14,21,28};
+            macdFastRange = new int[]{12,15,18};
+            macdSlowRange = new int[]{26,30,35};
+            macdSignalRange = new int[]{9,12,15};
+        }
+
         for (StrategyConfig.RuleConfig rule : cfg.getRules()) {
             for (Condition cond : rule.getConditions()) {
                 switch (cond.indicator.toUpperCase()) {
                     case "EMA":
-                        for (int f : new int[]{5, 9, 12}) {
-                            for (int s : new int[]{21, 26, 50}) {
+                        for (int f : emaFastRange) {
+                            for (int s : emaSlowRange) {
                                 if (f >= s) continue;
                                 StrategyConfig clone = cfg.copy();
                                 clone.setName(cfg.getName() + "_EMA_" + f + "x" + s);
-                                clone.getRules().get(0).getConditions().get(0).fast = f;
-                                clone.getRules().get(0).getConditions().get(0).slow = s;
+                                Condition c = clone.getRules().get(0).getConditions().get(0);
+                                c.fast = f;
+                                c.slow = s;
                                 list.add(clone);
                             }
                         }
                         break;
                     case "RSI":
-                        for (int p : new int[]{7, 14, 21}) {
+                        for (int p : rsiPeriods) {
                             StrategyConfig clone = cfg.copy();
                             clone.setName(cfg.getName() + "_RSI_" + p);
                             clone.getRules().get(0).getConditions().get(0).period = p;
@@ -273,9 +462,9 @@ public class BackTestingMarketDataScheduler implements Runnable {
                         }
                         break;
                     case "MACD":
-                        for (int f : new int[]{10, 12, 15})
-                            for (int s : new int[]{20, 26, 30})
-                                for (int sig : new int[]{7, 9, 12}) {
+                        for (int f : macdFastRange)
+                            for (int s : macdSlowRange)
+                                for (int sig : macdSignalRange) {
                                     if (f >= s) continue;
                                     StrategyConfig clone = cfg.copy();
                                     clone.setName(cfg.getName() + "_MACD_" + f + "-" + s + "-" + sig);

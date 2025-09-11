@@ -48,6 +48,9 @@ public class PortfolioSyncScheduler implements Runnable {
                 description = "Whether job can run in parallel"
         )
         boolean scheduler_concurrent() default false;
+
+        @AttributeDefinition(name = "Misfire Policy", description = "Reschedule on misfire")
+        String scheduler_misfire_policy() default "REPLACE";
     }
 
     @Activate

@@ -127,12 +127,14 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             }else {
                 ps.setString(1, t.getSymbol().getInstrumentKey());
             }
+            logger.info("Inserting trade {} entry={} stopLoss={} target={} pnl={}",
+                    t.getSymbol().getSymbol(), t.getEntryPrice(), t.getStopLoss(), t.getTarget(), t.getPnl());
 
 
             ps.setString(2, t.getSymbol().getSymbol());
             ps.setString(3, t.getSide().name());
             ps.setDouble(4, t.getEntryPrice());
-            ps.setDouble(5, t.getEntryPrice());
+            ps.setDouble(5,t.getEntryPrice());
             ps.setDouble(6, t.getStopLoss());
             ps.setDouble(7, t.getTarget());
             ps.setInt(8, t.getQuantity());
@@ -141,7 +143,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             if (t.getExitTime() != null) ps.setTimestamp(11, Timestamp.valueOf(t.getExitTime()));
             else ps.setNull(11, Types.TIMESTAMP);
             ps.setString(12, t.getStatus().toString());
-            ps.setDouble(13, t.getPnl());
+            ps.setDouble(13,t.getPnl());
             ps.setString(14, StringUtils.contains(t.getTimeFrame(), "m") ? "MIS" : "CNC");
             ps.setString(15, t.getTimeFrame());
 
@@ -371,49 +373,48 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 }
             }
 
-            boolean shouldUpdate = false;
+            // === Step 2: Merge strategies ===
+            List<StrategyResult> merged = new ArrayList<>(existing);
 
-            // === Step 2: If nothing exists yet, always insert ===
-            if (existing.isEmpty()) {
-                shouldUpdate = true;
-                logger.info("📥 No existing BEST_STRATEGY for {} → inserting new strategies", symbol);
-            } else {
-                // === Step 3: Compare new results with existing ===
-                for (StrategyResult newRes : bestConfigs) {
-                    boolean matched = false;
-                    for (StrategyResult oldRes : existing) {
-                        if (newRes.getName().equalsIgnoreCase(oldRes.getName())) {
-                            matched = true;
-                            if (newRes.getPnl() >= oldRes.getPnl() + 0.01 &&
-                                    newRes.getPnl() > newRes.getDrawdown()) {
-                                shouldUpdate = true;
-                                break;
-                            }
+            for (StrategyResult newRes : bestConfigs) {
+                boolean updated = false;
+                for (int i = 0; i < merged.size(); i++) {
+                    StrategyResult oldRes = merged.get(i);
+                    if (newRes.getName().equalsIgnoreCase(oldRes.getName()) &&
+                            newRes.getTimeframe().equalsIgnoreCase(oldRes.getTimeframe())) {
+
+                        // Replace only if new PnL is significantly better
+                        if (newRes.getPnl() >= oldRes.getPnl() + 0.01 &&
+                                newRes.getPnl() > newRes.getDrawdown()) {
+                            merged.set(i, newRes);
+                            logger.info("🔄 Replaced {} [{}] with better PnL ({} -> {})",
+                                    newRes.getName(), newRes.getTimeframe(),
+                                    oldRes.getPnl(), newRes.getPnl());
                         }
+                        updated = true;
+                        break;
                     }
-                    if (!matched) {
-                        // A completely new strategy not in existing → update
-                        shouldUpdate = true;
-                    }
+                }
+                if (!updated) {
+                    merged.add(newRes); // brand new strategy + timeframe
+                    logger.info("➕ Added new strategy {} [{}] for {}", newRes.getName(), newRes.getTimeframe(), symbol);
                 }
             }
 
-            // === Step 4: Persist only if required ===
-            if (shouldUpdate) {
-                String newJson = mapper.writeValueAsString(bestConfigs);
-                try (PreparedStatement ps = c.prepareStatement(updateSql)) {
-                    ps.setString(1, newJson);
-                    ps.setString(2, symbol);
-                    ps.executeUpdate();
-                    logger.info("🏆 Updated BEST_STRATEGY for {} -> {}", symbol, newJson);
-                }
-            } else {
-                logger.info("✅ No update: Existing strategies for {} are still better/equal", symbol);
+            // === Step 3: Persist merged list ===
+            String newJson = mapper.writeValueAsString(merged);
+            try (PreparedStatement ps = c.prepareStatement(updateSql)) {
+                ps.setString(1, newJson);
+                ps.setString(2, symbol);
+                ps.executeUpdate();
+                logger.info("🏆 Persisted BEST_STRATEGY for {} -> {}", symbol, newJson);
             }
+
         } catch (Exception e) {
             logger.error("❌ Failed updating BEST_STRATEGY for {}: {}", symbol, e.getMessage(), e);
         }
     }
+
 
     // -------------------- LIST OPEN TRADES FOR SYMBOL --------------------
     public List<TradeModel> listOpenTradesForSymbol(String symbol,String tableName) throws SQLException {
@@ -488,6 +489,14 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             ps.executeUpdate();
         }
     }
+
+    private double safeDouble(Double value) {
+        if (value == null || Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0.0; // or handle differently (NULL)
+        }
+        return value;
+    }
+
 
 
 

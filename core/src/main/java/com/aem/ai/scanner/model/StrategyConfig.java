@@ -1,6 +1,7 @@
 package com.aem.ai.scanner.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -122,6 +123,14 @@ public class StrategyConfig {
         }
         return clone;
     }
+    public String toJson() {
+        try {
+            return new ObjectMapper().writeValueAsString(this);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
 
 
     public static class RuleConfig {

@@ -34,7 +34,7 @@ public class TradeModel {
     }
 
     public double getLtp() {
-        return ltp;
+        return safeDouble(ltp);
     }
 
     public void setPnlPercentage(double pnlPercentage) {
@@ -42,7 +42,7 @@ public class TradeModel {
     }
 
     public double getPnlPercentage() {
-        return pnlPercentage;
+        return safeDouble(pnlPercentage);
     }
 
     public enum Status {
@@ -103,6 +103,31 @@ public class TradeModel {
         this.pnl = pnl;
     }
 
+    public boolean isValid() {
+        if (symbol == null || side == null) return false;
+
+        if (isInvalidNumber(entryPrice)) return false;
+        if (isInvalidNumber(stopLoss)) return false;
+        if (isInvalidNumber(target)) return false;
+        if (quantity <= 0) return false;
+
+        // exitPrice can be 0 if trade is still open, so only check if set
+        if (status == Status.CLOSED && isInvalidNumber(exitPrice)) return false;
+
+        return true;
+    }
+
+    private boolean isInvalidNumber(double value) {
+        return Double.isNaN(value) || Double.isInfinite(value) || value <= 0;
+    }
+    private double safeDouble(Double value) {
+        if (value == null || Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0.0; // or handle differently (NULL)
+        }
+        return value;
+    }
+
+
     // ===== Business logic helpers =====
 
     /** Increase quantity for an already open trade */
@@ -152,12 +177,12 @@ public class TradeModel {
     public String getTradeId() { return tradeId; }
     public InstrumentSymbol getSymbol() { return symbol; }
     public Signal.Side getSide() { return side; }
-    public double getEntryPrice() { return entryPrice; }
-    public double getExitPrice() { return exitPrice; }
+    public double getEntryPrice() { return safeDouble(entryPrice); }
+    public double getExitPrice() { return safeDouble(exitPrice); }
     public void setExitPrice(double exitPrice) { this.exitPrice = exitPrice; }
-    public double getStopLoss() { return stopLoss; }
+    public double getStopLoss() { return safeDouble(stopLoss); }
     public void setStopLoss(double stopLoss) { this.stopLoss = stopLoss; }
-    public double getTarget() { return target; }
+    public double getTarget() { return safeDouble(target); }
     public void setTarget(double target) { this.target = target; }
     public int getQuantity() { return quantity; }
     public LocalDateTime getEntryTime() { return getEntryTimeIST(); }
@@ -165,7 +190,7 @@ public class TradeModel {
     public void setExitTime(LocalDateTime exitTime) { this.exitTime = exitTime; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
-    public double getPnl() { return pnl; }
+    public double getPnl() { return safeDouble(pnl); }
     public void setPnl(double pnl) { this.pnl = pnl; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public void setEntryTime(LocalDateTime entryTime) { this.entryTime = entryTime; }
@@ -191,4 +216,5 @@ public class TradeModel {
                 ", pnl=" + pnl +
                 '}';
     }
+
 }

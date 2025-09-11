@@ -41,7 +41,7 @@ public class KiteAuthServiceImpl implements KiteAuthService {
 
     @Override
     public String getAccessTokenAndStoreToken(String requestToken, UserBrokerAccount userBrokerAccount,
-                                              String brokerAccountRef, String apiKey, String apiSecret,String brokerName) {
+                                              String brokerAccountRef, String apiKey, String apiSecret,String brokerName,long userId) {
         try {
             // 1️⃣ Check if a valid access token exists
             String existingToken = fetchExistingAccessToken(brokerAccountRef);
@@ -66,17 +66,12 @@ public class KiteAuthServiceImpl implements KiteAuthService {
             String publicToken = userNode.path("public_token").asText();
             long tokenExpiry = 24 * 60 * 60;
 
-            Long brokerAccountId = userBrokerAccount == null ?  getBrokerAccountId(userNode.path("user_id").asText(), brokerAccountRef) :userBrokerAccount.getAccountId();
-            if (brokerAccountId == null) {
-                log.error("Broker account not found for user {} /  / account {}",
-                        userNode.path("user_id").asText(),  brokerAccountRef);
-                return null;
-            }
-            // 3️⃣ Save new token in DB
-            upsertBrokerToken(brokerAccountId, userBrokerAccount.getUserId(), brokerName,
+            Long brokerAccountId = userBrokerAccount == null ?  getBrokerAccountId( brokerAccountRef) :userBrokerAccount.getAccountId();
+
+            upsertBrokerToken(brokerAccountId, userId, brokerName,
                     accessToken, publicToken, String.valueOf(tokenExpiry),brokerAccountRef);
 
-            log.info("✅ New access token stored successfully for broker={} / account={}", userBrokerAccount, brokerAccountRef);
+            log.info("✅ New access token stored successfully for broker={} /", brokerAccountRef);
             return accessToken;
 
         } catch (Exception e) {
@@ -103,8 +98,8 @@ public class KiteAuthServiceImpl implements KiteAuthService {
         }
     }
 
-    private Long getBrokerAccountId(String userId, String brokerAccountRef) {
-        if (StringUtils.isBlank(userId)|| StringUtils.isEmpty(brokerAccountRef)) {
+    private Long getBrokerAccountId( String brokerAccountRef) {
+        if ( StringUtils.isEmpty(brokerAccountRef)) {
             log.error("brokerAccountRef is empty, cannot fetch broker account for broker={} / account={}",  brokerAccountRef);
             return null;
         }
@@ -122,10 +117,10 @@ public class KiteAuthServiceImpl implements KiteAuthService {
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return rs.getLong("account_id");
-                log.warn("Broker account not found for user {} / broker {} / account {}", userId,  brokerAccountRef);
+                log.warn("Broker account not found for  account {}",   brokerAccountRef);
             }
         } catch (NumberFormatException nfe) {
-            log.error("Invalid userId '{}' for broker={} / account={}", userId, brokerAccountRef, nfe);
+            log.error("Invalid  for broker={} / account={}",  brokerAccountRef, nfe);
         } catch (Exception e) {
             log.error("Error fetching broker_account_id: {}", e.getMessage(), e);
         }

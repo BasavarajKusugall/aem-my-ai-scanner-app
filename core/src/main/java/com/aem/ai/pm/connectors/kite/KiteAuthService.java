@@ -10,5 +10,5 @@ public interface KiteAuthService {
      * @param userBrokerAccount
      * @return true if success, false otherwise
      */
-    String getAccessTokenAndStoreToken(String requestToken, UserBrokerAccount userBrokerAccount, String accountNumber, String apiKey, String apiSecret,String brokerName) ;
+    String getAccessTokenAndStoreToken(String requestToken, UserBrokerAccount userBrokerAccount, String accountNumber, String apiKey, String apiSecret,String brokerName,long userId) ;
 }

@@ -70,7 +70,8 @@ public class KiteCallbackServlet extends SlingAllMethodsServlet {
                 brokerAccountRef,
                 apiKey,        // pass null if KiteAuthService handles fetching from DB
                 apiSecret ,
-                "ZERODHA"// pass null if KiteAuthService handles fetching from DB
+                "ZERODHA",
+                userBrokerAccount.getUserId()
         );
 
         // Respond

@@ -15,5 +15,23 @@ public @interface KiteConfig {
     @AttributeDefinition(name="Base URL") String baseUrl() default "https://api.kite.trade";
     @AttributeDefinition(name="Login URL") String loginUrl() default "https://kite.zerodha.com/connect/login?v=3&api_key=";
     @AttributeDefinition(name="Rate Limit QPS") int qps() default 3;
+
+    @AttributeDefinition(
+            name = "Holdings Endpoint",
+            description = "API endpoint for fetching holdings"
+    )
+    String holdingsEndpoint() default "/portfolio/holdings";
+
+    @AttributeDefinition(
+            name = "Positions Endpoint",
+            description = "API endpoint for fetching positions"
+    )
+    String positionsEndpoint() default "/portfolio/positions";
+
+    @AttributeDefinition(
+            name = "Funds Endpoint",
+            description = "API endpoint for fetching funds / cash summary"
+    )
+    String fundsEndpoint() default "/user/margins/equity";
 }
 

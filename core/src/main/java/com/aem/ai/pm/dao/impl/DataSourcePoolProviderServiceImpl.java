@@ -2,6 +2,7 @@ package com.aem.ai.pm.dao.impl;
 
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.utils.OsgiUtils;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceReference;
@@ -67,6 +68,11 @@ public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProvider
             }
         } else {
             log.warn("{}⚠️ ServiceTracker not initialized. Falling back to BundleContext lookup{}", RED, RESET);
+        }
+        if (bundleContext == null || bundleContext.getBundle() == null
+                || bundleContext.getBundle().getState() != Bundle.ACTIVE) {
+            log.error("❌ BundleContext is invalid (bundle not active). Skipping DataSource lookup.");
+            return null;
         }
 
         // Fallback: use direct BundleContext lookup

@@ -55,6 +55,9 @@ public class PortfolioScheduler implements Runnable {
                 description = "Whether multiple jobs can run in parallel"
         )
         boolean scheduler_concurrent() default false;
+
+        @AttributeDefinition(name = "Misfire Policy", description = "Reschedule on misfire")
+        String scheduler_misfire_policy() default "REPLACE";
     }
 
     @Activate
