@@ -131,8 +131,17 @@ public class StrategyEngineImpl implements StrategyEngine {
 
             } else if (exit) {
                 double exitPrice = candles.get(candles.size() - 1).getClose();
-                double confidence = computeConfidence(cfg, series, exitPrice, 0, 0);
-                Signal s = new Signal(symbol, Signal.Side.SELL, exitPrice, Double.NaN, Double.NaN, timeframe, confidence);
+                boolean isBuy = false; // or false for short
+                double[] sltp = StopLossTargetCalculator.computeSLTP(series,
+                        14,   // ATR period
+                        10,   // Swing lookback
+                        1.0,  // ATR buffer
+                        exitPrice,
+                        isBuy);
+                double stopLoss = sltp[0];
+                double target = sltp[1];
+                double confidence = computeConfidence(cfg, series, exitPrice, stopLoss, target);
+                Signal s = new Signal(symbol, Signal.Side.SELL, exitPrice, stopLoss, target, timeframe, confidence);
 
                 log.info(YELLOW + "[{} {}] Step 4: Exit signal generated in {} ms" + RESET,
                         symbol, cfg.getName(), (System.nanoTime() - stepStart) / 1_000_000);

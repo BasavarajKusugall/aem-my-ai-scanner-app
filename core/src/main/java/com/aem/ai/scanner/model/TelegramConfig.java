@@ -9,6 +9,8 @@ public class TelegramConfig {
     private long botUserId;
     private String purpose; // MONITOR, ALERT, etc.
     private boolean isGroupEnabled;
+    private int priority;
+    private boolean active;
 
     // --- Getters & Setters ---
     public long getBotChatId() { return botChatId; }
@@ -34,4 +36,20 @@ public class TelegramConfig {
 
     public boolean isGroupEnabled() { return isGroupEnabled; }
     public void setGroupEnabled(boolean groupEnabled) { isGroupEnabled = groupEnabled; }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
 }

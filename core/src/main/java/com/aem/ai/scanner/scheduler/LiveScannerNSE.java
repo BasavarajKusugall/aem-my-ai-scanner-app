@@ -5,6 +5,7 @@ import com.aem.ai.scanner.api.MarketDataService;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.dao.WatchlistDao;
 import com.aem.ai.scanner.model.*;
+import com.aem.ai.scanner.scanner.OHLStrategyScanner;
 import com.aem.ai.scanner.services.GeminiService;
 import com.aem.ai.scanner.services.StrategyEngine;
 import com.aem.ai.scanner.services.TelegramService;
@@ -86,6 +87,8 @@ public class LiveScannerNSE implements Runnable {
     @Reference
     private GeminiService geminiService;
 
+    @Reference
+    private OHLStrategyScanner ohlStrategyScanner;
 
 
 
@@ -181,6 +184,7 @@ public class LiveScannerNSE implements Runnable {
             if (candles == null || candles.isEmpty()) {
                 throw new RuntimeException("No candles returned");
             }
+            Optional<Signal> ohlcSignal = ohlStrategyScanner.evaluateLatest(candles, timeframe);
 
             tradesMonitor(symbol, candles);
 

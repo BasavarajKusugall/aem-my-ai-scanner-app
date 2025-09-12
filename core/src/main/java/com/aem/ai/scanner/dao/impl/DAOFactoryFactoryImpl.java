@@ -496,6 +496,74 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         }
         return value;
     }
+// Inside DAOFactoryFactoryImpl
+
+    /**
+     * Insert a new TelegramConfig or update an existing one by bot_user_id.
+     */
+    public void insertOrUpdateTelegramConfig(TelegramConfig cfg) {
+        if (cfg == null || cfg.getBotUserId() == 0) {
+            logger.warn("⚠️ TelegramConfig is null or bot_user_id is 0, skipping insert/update");
+            return;
+        }
+
+        String selectSql = "SELECT id FROM telegram_bot_config WHERE bot_user_id = ?";
+        String insertSql = "INSERT INTO telegram_bot_config " +
+                "(bot_user_id, bot_name, bot_token, bot_chat_id, chat_type, chat_title, " +
+                "purpose, is_group_enabled, priority, is_active, daily_usage_count, daily_usage_limit, fail_count, fail_threshold, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 5000, 0, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+        String updateSql = "UPDATE telegram_bot_config SET " +
+                "bot_name=?, bot_token=?, bot_chat_id=?, chat_type=?, chat_title=?, purpose=?, " +
+                "is_group_enabled=?, priority=?, is_active=?, updated_at=CURRENT_TIMESTAMP " +
+                "WHERE bot_user_id=?";
+
+        try (Connection c = conn()) {
+            // Check existence
+            boolean exists;
+            try (PreparedStatement ps = c.prepareStatement(selectSql)) {
+                ps.setLong(1, cfg.getBotUserId());
+                try (ResultSet rs = ps.executeQuery()) {
+                    exists = rs.next();
+                }
+            }
+
+            if (exists) {
+                // Update
+                try (PreparedStatement ps = c.prepareStatement(updateSql)) {
+                    ps.setString(1, cfg.getBotName());
+                    ps.setString(2, cfg.getBotToken());
+                    ps.setLong(3, cfg.getBotChatId());
+                    ps.setString(4, cfg.getChatType());
+                    ps.setString(5, cfg.getChatTitle());
+                    ps.setString(6, cfg.getPurpose());
+                    ps.setBoolean(7, cfg.isGroupEnabled());
+                    ps.setInt(8, cfg.getPriority());
+                    ps.setBoolean(9, cfg.isActive());
+                    ps.setLong(10, cfg.getBotUserId());
+                    int updated = ps.executeUpdate();
+                    logger.info("🟢 Updated Telegram config for bot_user_id={} (rows affected={})", cfg.getBotUserId(), updated);
+                }
+            } else {
+                // Insert
+                try (PreparedStatement ps = c.prepareStatement(insertSql)) {
+                    ps.setLong(1, cfg.getBotUserId());
+                    ps.setString(2, cfg.getBotName());
+                    ps.setString(3, cfg.getBotToken());
+                    ps.setLong(4, cfg.getBotChatId());
+                    ps.setString(5, cfg.getChatType());
+                    ps.setString(6, cfg.getChatTitle());
+                    ps.setString(7, cfg.getPurpose());
+                    ps.setBoolean(8, cfg.isGroupEnabled());
+                    ps.setInt(9, cfg.getPriority());
+                    ps.setBoolean(10, cfg.isActive());
+                    int inserted = ps.executeUpdate();
+                    logger.info("🟢 Inserted new Telegram config for bot_user_id={} (rows affected={})", cfg.getBotUserId(), inserted);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("❌ Failed to insert/update Telegram config for bot_user_id={}: {}", cfg.getBotUserId(), e.getMessage(), e);
+        }
+    }
 
 
 

@@ -47,4 +47,5 @@ public interface DAOFactory {
     void updateQuantity(String tradeId, int newQuantity, String tableName) throws SQLException;
 
     void closeTrade(String tradeId, double exitPrice, String reason, String tableName) throws SQLException;
+    void insertOrUpdateTelegramConfig(TelegramConfig cfg);
 }

@@ -12,6 +12,10 @@ public class Signal {
     private double stopLossPercent;
     private double targetPercent;
 
+    public Signal(Side side, double entry, double stopLoss, double target) {
+        this.side = side; this.entryPrice = entry; this.stopLoss = stopLoss; this.target = target;
+    }
+
     public double getStopLossPercent() {
         return stopLossPercent;
     }
@@ -34,15 +38,15 @@ public class Signal {
     }
 
     public enum Side {BUY, SELL}
-    private final String id;
-    private final InstrumentSymbol symbol;
+    private  String id;
+    private  InstrumentSymbol symbol;
     private final Side side;
     private final double entryPrice;
     private final double stopLoss;
     private final double target;
-    private final ZonedDateTime time;
-    private final String timeframe;
-    private final double confidence;
+    private  ZonedDateTime time;
+    private  String timeframe;
+    private  double confidence;
 
     public Signal(InstrumentSymbol symbol, Side side, double entryPrice, double stopLoss, double target, String timeframe, double confidence) {
         this.id = UUID.randomUUID().toString();
