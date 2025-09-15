@@ -261,6 +261,10 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         String cond = " AND purpose='CRYPTO_ALERTS'";
         return fetchTelegramConfigs(cond);
     }
+    public List<TelegramConfig> fetchTelegramDailyOHLAlertsConfigs() {
+        String cond = " AND purpose='OHL'";
+        return fetchTelegramConfigs(cond);
+    }
 
     @Override
     public List<TelegramConfig> fetchTelegramBotUserIDConfigs(String bot_user_id) {

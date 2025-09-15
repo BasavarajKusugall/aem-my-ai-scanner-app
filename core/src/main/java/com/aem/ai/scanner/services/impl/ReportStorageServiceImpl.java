@@ -38,7 +38,6 @@ public class ReportStorageServiceImpl implements ReportStorageService {
                             String mimeType) throws Exception {
 
         try (ResourceResolver resolver = resolverService.getServiceResolver()) {
-
             // Ensure base folder exists
             String folderPath = basePath != null ? basePath : "/var/mytrades";
             folderPath += "/" + LocalDate.now().getYear() + "/"
@@ -47,31 +46,41 @@ public class ReportStorageServiceImpl implements ReportStorageService {
 
             Resource folderRes = resolver.getResource(folderPath);
             if (folderRes == null) {
-                folderRes = ResourceUtil.getOrCreateResource(resolver, folderPath, "sling:Folder", null, false);
+                folderRes = ResourceUtil.getOrCreateResource(resolver, folderPath,
+                        Collections.singletonMap("jcr:primaryType", "sling:Folder"),
+                        null, true);
             }
 
             // File resource path
             String filePath = folderPath + "/" + fileName;
             Resource fileRes = resolver.getResource(filePath);
             if (fileRes == null) {
-                fileRes = ResourceUtil.getOrCreateResource(resolver, filePath, "nt:file", null, false);
+                fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
+                        Collections.singletonMap("jcr:primaryType", "nt:file"),
+                        null, true);
             }
 
             // jcr:content node
-            Resource contentRes = fileRes.getChild("jcr:content");
+            String contentPath = filePath + "/jcr:content";
+            Resource contentRes = resolver.getResource(contentPath);
             if (contentRes == null) {
-                contentRes = ResourceUtil.getOrCreateResource(resolver, filePath + "/jcr:content", "nt:resource", null, false);
+                contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
+                        Collections.singletonMap("jcr:primaryType", "nt:resource"),
+                        null, true);
             }
 
             // Set properties
             ModifiableValueMap props = contentRes.adaptTo(ModifiableValueMap.class);
-            props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
-            props.put("jcr:mimeType", mimeType);
-            props.put("jcr:lastModified", Calendar.getInstance());
+            if (props != null) {
+                props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
+                props.put("jcr:mimeType", mimeType);
+                props.put("jcr:lastModified", Calendar.getInstance());
+            }
 
             resolver.commit();
         }
     }
+
 
 
     @ObjectClassDefinition(

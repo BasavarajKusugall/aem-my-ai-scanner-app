@@ -1,11 +1,14 @@
 package com.aem.ai.scanner.services.impl;
 
+import com.aem.ai.scanner.model.StockScannerResult;
 import com.aem.ai.scanner.model.TradeAnalysis;
 import com.aem.ai.scanner.services.GeminiService;
 import com.aem.ai.scanner.services.ResolverService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.resource.Resource;
@@ -42,7 +45,7 @@ import java.util.Map;
 public class GeminiServiceImpl implements GeminiService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiServiceImpl.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper().setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);;
 
     @Reference
     private ResolverService serviceResolver;
@@ -52,6 +55,7 @@ public class GeminiServiceImpl implements GeminiService {
     private String promptFilePath;
     private String tradeSignalAnalysisPromptFilePath;
     private String portFolioAnalysisPromptFilePath;
+    private String nseStocksScannerPromptFilePath;
 
     @ObjectClassDefinition(
             name = "BSK Gemini Service Config",
@@ -72,6 +76,9 @@ public class GeminiServiceImpl implements GeminiService {
 
         @AttributeDefinition(name = "Portfolio Analysis Prompt File Path", description = "Path to prompt.txt file in repository or file system")
         String gemini_portfolio_analysis_prompt_path() default "/content/ai-scanner/ai/prompts/portfolio_analysis_template.txt";
+
+        @AttributeDefinition(name = "NSE Stocks scanner prompt path", description = "NSE Stocks scanner prompt path")
+        String gemini_nse_stocks_scanner_prompt_path() default "/content/ai-scanner/ai/prompts/gemini_daily_stocks_scanner.txt";
     }
 
     @Activate
@@ -82,6 +89,7 @@ public class GeminiServiceImpl implements GeminiService {
         this.promptFilePath = PropertiesUtil.toString(config.gemini_daily_news_updates_prompt_path(), "");
         this.tradeSignalAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_trade_signal_analysis_prompt_path(), "");
         this.portFolioAnalysisPromptFilePath = PropertiesUtil.toString(config.gemini_portfolio_analysis_prompt_path(), "");
+        this.nseStocksScannerPromptFilePath = PropertiesUtil.toString(config.gemini_nse_stocks_scanner_prompt_path(), "");
         log.info("GeminiService activated with endpoint: {}", this.endpoint);
     }
     @Override
@@ -96,6 +104,28 @@ public class GeminiServiceImpl implements GeminiService {
             throw new RuntimeException("Gemini API error: " + resp.statusCode() + " " + resp.body());
         }
     }
+
+    @Override
+    public StockScannerResult runStockScanner() throws Exception {
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        String aiResponse = getAiResponse(nseStocksScannerPromptFilePath);
+        if (StringUtils.isNotEmpty(aiResponse)) {
+            if (aiResponse.startsWith("```")) {
+                aiResponse = aiResponse.replaceAll("```json", "")
+                        .replaceAll("```", "")
+                        .trim();
+            }
+            StockScannerResult result = mapper.readValue(aiResponse, StockScannerResult.class);
+            if ( result == null ) {
+                return null;
+            }
+            log.info("Successfully parsed StockScannerResult. Market Bias: {}", result.getMarketBias());
+            return result;
+        }
+        return null;
+    }
+
     @Override
     public TradeAnalysis tradeSignalAnalysis(String signalMsg) throws Exception {
         log.info("Starting Gemini fundamentalAnalysis for signal...");
@@ -167,8 +197,23 @@ public class GeminiServiceImpl implements GeminiService {
     }
 
     @Override
-    public String todayNewsUpdates() throws Exception {
+    public String getAiResponse() throws Exception {
         HttpResponse<String> resp = getHttpResponse(StringUtils.EMPTY, tradeSignalAnalysisPromptFilePath);
+        if (resp == null) {
+            throw new RuntimeException("Failed to get response from Gemini API");
+        }
+        if (resp.statusCode() == 200) {
+            JsonNode geminiResp = mapper.readTree(resp.body());
+            String jsonText = geminiResp.at("/candidates/0/content/parts/0/text").asText("").trim();
+
+            return jsonText;
+        } else {
+            log.error("Gemini API error: {} {}", resp.statusCode(), resp.body());
+            throw new RuntimeException("Gemini API error: " + resp.statusCode() + " " + resp.body());
+        }
+    }
+    public String getAiResponse(String promptPath) throws Exception {
+        HttpResponse<String> resp = getHttpResponse(StringUtils.EMPTY, promptPath);
         if (resp == null) {
             throw new RuntimeException("Failed to get response from Gemini API");
         }

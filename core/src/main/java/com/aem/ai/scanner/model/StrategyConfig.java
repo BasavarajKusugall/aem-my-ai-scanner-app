@@ -7,6 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyConfig {
+
+    public StrategyConfig(String name) {
+        this.name = name;
+    }
+
+    public StrategyConfig() {
+    }
+
     private String name;
     private String symbol;
     private String timeframe;

@@ -36,6 +36,7 @@ public interface DAOFactory {
     List<TelegramConfig> fetchTelegramDailyCryptoAlertsConfigs();
     List<TelegramConfig> fetchTelegramBotUserIDConfigs(String bot_user_id);
     List<StrategyConfig> loadActiveStrategies() throws Exception;
+    List<TelegramConfig> fetchTelegramDailyOHLAlertsConfigs();
     void persistBestStrategies(String watchListTable,String symbol, List<StrategyResult> bestConfigs);
     int appendOpenTradeComment(InstrumentSymbol symbol, Signal.Side side, String comment, String tableName) throws SQLException;
     boolean insertTradeIfNoOpen(TradeModel t, TradeAnalysis analysis,String tableName) throws SQLException;

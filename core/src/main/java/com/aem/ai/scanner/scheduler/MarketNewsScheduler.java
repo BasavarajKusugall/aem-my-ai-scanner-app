@@ -78,7 +78,7 @@ public class MarketNewsScheduler implements Runnable {
             return;
         }
         try {
-            String todayNewsUpdates = geminiService.todayNewsUpdates();
+            String todayNewsUpdates = geminiService.getAiResponse();
             LOGGER.info("📈 Gemini todayNewsUpdates: {}", todayNewsUpdates);
             if (StringUtils.isNotEmpty(todayNewsUpdates)){
                 telegramService.sendMessageDailyNews(todayNewsUpdates);

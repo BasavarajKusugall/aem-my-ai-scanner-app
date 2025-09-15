@@ -1,9 +1,10 @@
 package com.aem.ai.scanner.scanner.impl;
 
-
 import com.aem.ai.scanner.model.Candle;
+import com.aem.ai.scanner.model.InstrumentSymbol;
 import com.aem.ai.scanner.model.Signal;
 import com.aem.ai.scanner.scanner.OHLStrategyScanner;
+import com.aem.ai.scanner.services.Ta4jService;
 import com.aem.ai.scanner.services.TelegramService;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.*;
@@ -26,8 +27,7 @@ import static com.aem.ai.scanner.utils.Utils.mapTimeframe;
 @Designate(ocd = OHLStrategyScannerImpl.Config.class)
 @Component(
         service = OHLStrategyScanner.class,
-        immediate = true,
-        configurationPolicy = ConfigurationPolicy.REQUIRE
+        immediate = true
 )
 public class OHLStrategyScannerImpl implements OHLStrategyScanner {
 
@@ -45,6 +45,9 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
 
     @Reference
     private TelegramService telegram;
+
+    @Reference
+    private Ta4jService ta4jService;
 
     @ObjectClassDefinition(
             name = "OHL (Open=High/Low) Strategy Service",
@@ -73,18 +76,20 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
     @Activate
     @Modified
     protected void activate(Config cfg) {
+        long start = System.currentTimeMillis();
         this.config = cfg;
         log.info(CYAN + "✅ OHLStrategyService activated" + RESET +
-                        " (enable={}, tol={}, atrBreak={}, vol={}, pivot={}, telegram={})",
+                        " (enable={}, tol={}, atrBreak={}, vol={}, pivot={}, telegram={}) [{}ms]",
                 cfg.enable(), cfg.tolerancePct(), cfg.atrBreakFactor(),
-                cfg.minAvgVolume(), cfg.enablePivotFilter(), cfg.enableTelegram());
+                cfg.minAvgVolume(), cfg.enablePivotFilter(), cfg.enableTelegram(),
+                System.currentTimeMillis() - start);
     }
 
     @Deactivate
     protected void deactivate() {
-        log.info(RED + "🛑 OHLStrategyService deactivated" + RESET);
+        long start = System.currentTimeMillis();
+        log.info(RED + "🛑 OHLStrategyService deactivated" + RESET + " [{}ms]", System.currentTimeMillis() - start);
     }
-
 
     // --- Pivot Levels calculator
     public static class PivotLevels {
@@ -100,8 +105,9 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
         }
     }
 
-    /** Convert List<Candle> -> BarSeries */
+    /** Convert List<Candle> -> BarSeries with logging */
     private BarSeries buildSeries(String name, List<Candle> candles, Duration barDuration) {
+        long start = System.currentTimeMillis();
         BaseBarSeriesBuilder builder = new BaseBarSeriesBuilder();
         BarSeries series = builder.withName(name).build();
 
@@ -117,8 +123,11 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
                     .build();
             series.addBar(bar);
         }
+        log.debug(BLUE + "ℹ️ Built BarSeries [{}] with {} bars [{}ms]" + RESET,
+                name, series.getBarCount(), System.currentTimeMillis() - start);
         return series;
     }
+
     private boolean priceBreak(BarSeries series, ATRIndicator atr, int index, double factor, boolean bullish) {
         double open = series.getBar(0).getOpenPrice().doubleValue();
         double latestClose = series.getBar(index).getClosePrice().doubleValue();
@@ -130,6 +139,7 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
 
     /** Build OHL strategy rules */
     private Strategy buildStrategy(BarSeries series) {
+        long start = System.currentTimeMillis();
         ClosePriceIndicator close = new ClosePriceIndicator(series);
         ATRIndicator atr = new ATRIndicator(series, 14);
         MACDIndicator macd = new MACDIndicator(close, 12, 26);
@@ -162,88 +172,93 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
         Rule exit = new StopGainRule(close, DecimalNum.valueOf(0.02))
                 .or(new StopLossRule(close, DecimalNum.valueOf(0.01)));
 
+        log.debug(BLUE + "ℹ️ Strategy built for series [{}] [{}ms]" + RESET,
+                series.getName(), System.currentTimeMillis() - start);
         return new BaseStrategy(entry, exit);
     }
 
     /**
      * Evaluate latest signal with timeframe string (e.g. "5m", "15m", "1h", "1d")
      */
-    public Optional<Signal> evaluateLatest(List<Candle> candles, String timeframe) {
+    public Optional<Signal> evaluateLatest(List<Candle> candles, String timeframe, InstrumentSymbol symbol) {
+        long start = System.currentTimeMillis();
         if (config == null || !config.enable()) {
-            log.debug(YELLOW + "⚠️ OHL strategy disabled, skipping" + RESET);
+            log.debug(YELLOW + "⚠️ OHL strategy disabled, skipping [{}ms]" + RESET, System.currentTimeMillis() - start);
             return Optional.empty();
         }
         if (candles == null || candles.isEmpty()) return Optional.empty();
 
-        Duration barDuration = mapTimeframe(timeframe);
-        BarSeries series = buildSeries("LIVE-" + timeframe, candles, barDuration);
-        Strategy strategy = buildStrategy(series);
+        try {
+            String seriesName = symbol.getSymbol() + "-" + timeframe;
+            BarSeries series = ta4jService.buildSeries(seriesName, candles, timeframe);
+            Strategy strategy = buildStrategy(series);
 
-        int last = series.getEndIndex();
-        Bar lastBar = series.getBar(last);
+            int last = series.getEndIndex();
+            Bar lastBar = series.getBar(last);
 
-        if (strategy.shouldEnter(last)) {
-            var sig = new Signal(Signal.Side.BUY,
-                    lastBar.getClosePrice().doubleValue(),
-                    lastBar.getClosePrice().doubleValue() * 0.99,
-                    lastBar.getClosePrice().doubleValue() * 1.02);
+            // --- BUY signal
+            if (strategy.shouldEnter(last)) {
+                var sig = new Signal(Signal.Side.BUY,
+                        lastBar.getClosePrice().doubleValue(),
+                        lastBar.getClosePrice().doubleValue() * 0.99,
+                        lastBar.getClosePrice().doubleValue() * 1.02);
 
-            if (config.enablePivotFilter() && !pivotOk(sig, candles)) {
-                log.info(YELLOW + "🚫 BUY blocked by pivot filter at {}" + RESET, sig.getEntryPrice());
-                return Optional.empty();
+                if (config.enablePivotFilter() && !pivotOk(sig, candles)) {
+                    log.info(YELLOW + "🚫 BUY blocked by pivot filter at {} [{}ms]" + RESET,
+                            sig.getEntryPrice(), System.currentTimeMillis() - start);
+                    return Optional.empty();
+                }
+
+                log.info(GREEN + "📈 BUY [{}] signal: {} [{}ms]" + RESET,
+                        timeframe, sig, System.currentTimeMillis() - start);
+
+                return Optional.of(sig);
             }
 
-            log.info(GREEN + "📈 BUY [{}] signal: {}" + RESET, timeframe, sig);
-            sendTelegram("📈 *BUY " + timeframe + "*\nEntry: " + sig.getEntryPrice() +
-                    "\nSL: " + sig.getStopLoss() + "\nTP: " + sig.getTarget());
-            return Optional.of(sig);
-        }
+            // --- SELL signal
+            if (strategy.shouldExit(last)) {
+                Signal sig = new Signal(Signal.Side.SELL,
+                        lastBar.getClosePrice().doubleValue(),
+                        lastBar.getClosePrice().doubleValue(),
+                        lastBar.getClosePrice().doubleValue());
 
-        if (strategy.shouldExit(last)) {
-            Signal sig = new Signal(Signal.Side.SELL,
-                    lastBar.getClosePrice().doubleValue(),
-                    lastBar.getClosePrice().doubleValue(),
-                    lastBar.getClosePrice().doubleValue());
+                if (config.enablePivotFilter() && !pivotOk(sig, candles)) {
+                    log.info(YELLOW + "🚫 SELL blocked by pivot filter at {} [{}ms]" + RESET,
+                            sig.getEntryPrice(), System.currentTimeMillis() - start);
+                    return Optional.empty();
+                }
 
-            if (config.enablePivotFilter() && !pivotOk(sig, candles)) {
-                log.info(YELLOW + "🚫 SELL blocked by pivot filter at {}" + RESET, sig.getEntryPrice());
-                return Optional.empty();
+                log.info(RED + "📉 SELL [{}] signal: {} [{}ms]" + RESET,
+                        timeframe, sig, System.currentTimeMillis() - start);
+                return Optional.of(sig);
             }
 
-            log.info(RED + "📉 SELL [{}] signal: {}" + RESET, timeframe, sig);
-            sendTelegram("📉 *SELL " + timeframe + "*\nExit: " + sig.getEntryPrice());
-            return Optional.of(sig);
-        }
+            log.debug(BLUE + "ℹ️ No entry/exit signal generated for latest bar [{}] [{}ms]" + RESET,
+                    timeframe, System.currentTimeMillis() - start);
+            return Optional.empty();
 
-        log.debug(BLUE + "ℹ️ No entry/exit signal generated for latest bar [{}]" + RESET, timeframe);
-        return Optional.empty();
-    }
-
-
-    /** Send to Telegram if enabled */
-    private void sendTelegram(String msg) {
-        if (config != null && config.enableTelegram()) {
-            try {
-                telegram.sendMessageDailyStocksAlerts(msg);
-            } catch (Exception e) {
-                log.error(RED + "❌ Failed to send Telegram alert: {}" + RESET, e.getMessage(), e);
-            }
+        } catch (Exception e) {
+            log.error(RED + "❌ Error evaluating OHL strategy [{}] [{}ms]: {}" + RESET,
+                    timeframe, System.currentTimeMillis() - start, e.getMessage(), e);
+            return Optional.empty();
         }
     }
 
     /** Check pivot filter conditions */
     private boolean pivotOk(Signal signal, List<Candle> candles) {
+        long start = System.currentTimeMillis();
         if (candles.size() < 2) return true; // not enough data for pivot check
 
         Candle yesterday = candles.get(candles.size() - 2);
         PivotLevels pivots = new PivotLevels(yesterday.high, yesterday.low, yesterday.close);
         double entry = signal.getEntryPrice();
 
-        if (signal.getSide() == Signal.Side.BUY) {
-            return entry < pivots.r1;
-        } else {
-            return entry > pivots.s1;
-        }
+        boolean ok = signal.getSide() == Signal.Side.BUY
+                ? entry < pivots.r1
+                : entry > pivots.s1;
+
+        log.debug(BLUE + "ℹ️ Pivot check {} [{}ms]" + RESET, ok, System.currentTimeMillis() - start);
+        return ok;
     }
 
     // --- Custom Rules
@@ -267,4 +282,3 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
         }
     }
 }
-

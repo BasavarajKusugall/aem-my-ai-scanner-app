@@ -1,6 +1,7 @@
 package com.aem.ai.scanner.services;
 
 
+import com.aem.ai.scanner.model.StockScannerResult;
 import com.aem.ai.scanner.model.TradeAnalysis;
 
 public interface GeminiService {
@@ -12,6 +13,7 @@ public interface GeminiService {
      * @throws Exception if Gemini API call or parsing fails
      */
     TradeAnalysis tradeSignalAnalysis(String signalMsg) throws Exception;
-    String todayNewsUpdates() throws Exception;
+    String getAiResponse() throws Exception;
     String analyzePortfolio(String portfolioJson) throws Exception;
+    StockScannerResult runStockScanner() throws Exception;
 }

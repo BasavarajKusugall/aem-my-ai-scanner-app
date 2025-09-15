@@ -16,6 +16,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 
+import static com.aem.ai.scanner.utils.TelegramUtils.extractConfigFromUpdates;
+
 /**
  * Servlet to register or update a Telegram bot config via DAO.
  * Example: /bin/telegram/register?apiKey=<BOT_TOKEN>
@@ -52,7 +54,7 @@ public class TelegramRegisterServlet extends SlingAllMethodsServlet {
 
         try {
             // Call Telegram API getMe
-            String url = "https://api.telegram.org/bot" + apiKey + "/getMe";
+            String url = "https://api.telegram.org/bot" + apiKey + "/getUpdates";
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(5000);
@@ -74,14 +76,11 @@ public class TelegramRegisterServlet extends SlingAllMethodsServlet {
                     logColored(YELLOW, "[WARN] Telegram API returned  ok"+root);
                     return;
                 }
-                JsonNode firstMessage = result.get(0).get("message");
-                long chatId = 000;
-                if (firstMessage != null && firstMessage.has("chat")) {
-                     chatId = firstMessage.get("chat").get("id").asLong();
-                }
-                long botUserId = result.get("id").asLong();
-                String botName = result.get("first_name").asText();
-                String username = result.has("username") ? result.get("username").asText() : botName;
+
+                TelegramConfig telegramConfig = extractConfigFromUpdates(root.toString(), apiKey, "OHL");
+
+                long botUserId = telegramConfig.getBotUserId();
+                String username = telegramConfig.getUsername();
 
                 // Use DAO to fetch existing config
                 List<TelegramConfig> existingConfigs = daoFactory.fetchTelegramBotUserIDConfigs(String.valueOf(botUserId));
@@ -91,34 +90,18 @@ public class TelegramRegisterServlet extends SlingAllMethodsServlet {
                     TelegramConfig cfg = existingConfigs.get(0);
                     cfg.setBotToken(apiKey);
                     daoFactory.insertOrUpdateTelegramConfig(cfg); // Implement this DAO method
-                    logColored(GREEN, "[UPDATE] Updated Telegram config for bot " + botName + " (" + botUserId + ")");
+                    logColored(GREEN, "[UPDATE] Updated Telegram config for bot " + username + " (" + botUserId + ")");
                 } else {
                     // Insert new
-                    TelegramConfig cfg = new TelegramConfig();
-                    cfg.setBotUserId(botUserId);
-                    cfg.setBotName(botName);
-                    cfg.setBotToken(apiKey);
-                    cfg.setBotChatId(chatId);
-                    cfg.setChatType("private");
-                    cfg.setChatTitle(username);
-                    cfg.setPurpose("General Bot");
-                    cfg.setGroupEnabled(false);
-                    cfg.setPriority(1);
-                    cfg.setActive(true);
-                    daoFactory.insertOrUpdateTelegramConfig(cfg); // Implement this DAO method
-                    logColored(GREEN, "[INSERT] Registered new Telegram bot " + botName + " (" + botUserId + ")");
+                    daoFactory.insertOrUpdateTelegramConfig(telegramConfig); // Implement this DAO method
+                    logColored(GREEN, "[INSERT] Registered new Telegram bot " + username + " (" + botUserId + ")");
                 }
 
                 // Send success JSON back
-                String resultJson = MAPPER.createObjectNode()
-                        .put("ok", true)
-                        .put("bot_user_id", botUserId)
-                        .put("bot_name", botName)
-                        .put("username", username)
-                        .toString();
+
 
                 response.setStatus(200);
-                writeJson(response, resultJson);
+                writeJson(response, telegramConfig.toString());
             }
 
         } catch (Exception e) {

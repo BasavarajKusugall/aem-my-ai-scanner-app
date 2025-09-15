@@ -184,7 +184,19 @@ public class LiveScannerNSE implements Runnable {
             if (candles == null || candles.isEmpty()) {
                 throw new RuntimeException("No candles returned");
             }
-            Optional<Signal> ohlcSignal = ohlStrategyScanner.evaluateLatest(candles, timeframe);
+            if (StringUtils.containsIgnoreCase(timeframe,"m")){
+                log.info( " Check for the OHL scanner " );
+                Optional<Signal> ohlcSignal = ohlStrategyScanner.evaluateLatest(candles, timeframe,  symbol);
+                if (null != ohlcSignal && ohlcSignal.isPresent()) {
+                    log.info("OHL Strategy signal for {} {}: {} (score={})",
+                            symbol.getSymbol(), timeframe,
+                            ohlcSignal.get().getSide(), ohlcSignal.get().getScore());
+                    handleSignal(symbol, timeframe,
+                            new StrategyConfig("OHL Strategy"),
+                            ohlcSignal.get());
+                }
+            }
+
 
             tradesMonitor(symbol, candles);
 

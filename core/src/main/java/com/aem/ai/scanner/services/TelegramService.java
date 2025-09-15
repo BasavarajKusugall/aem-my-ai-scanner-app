@@ -23,4 +23,5 @@ public interface TelegramService {
     void sendMonitorLog(String level, String text);
 
     void sendMessageToUser(String telegramBotUserId, String message);
+    void sendMessageOHLAlerts( String message);
 }

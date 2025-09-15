@@ -11,6 +11,7 @@ public class TelegramConfig {
     private boolean isGroupEnabled;
     private int priority;
     private boolean active;
+    private String username;
 
     // --- Getters & Setters ---
     public long getBotChatId() { return botChatId; }
@@ -51,5 +52,30 @@ public class TelegramConfig {
 
     public boolean isActive() {
         return active;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    @Override
+    public String toString() {
+        return "TelegramConfig{" +
+                "botChatId=" + botChatId +
+                ", chatType='" + chatType + '\'' +
+                ", chatTitle='" + chatTitle + '\'' +
+                ", botName='" + botName + '\'' +
+                ", botToken='" + botToken + '\'' +
+                ", botUserId=" + botUserId +
+                ", purpose='" + purpose + '\'' +
+                ", isGroupEnabled=" + isGroupEnabled +
+                ", priority=" + priority +
+                ", active=" + active +
+                ", username='" + username + '\'' +
+                '}';
     }
 }
