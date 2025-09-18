@@ -1,7 +1,7 @@
 package com.aem.ai.scanner.dao;
 
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;

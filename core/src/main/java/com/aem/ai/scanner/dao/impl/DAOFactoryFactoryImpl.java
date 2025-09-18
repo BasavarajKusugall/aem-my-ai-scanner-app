@@ -1,6 +1,6 @@
 package com.aem.ai.scanner.dao.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.scanner.dao.DAOConfig;
 import com.aem.ai.scanner.dao.DAOFactory;
@@ -17,9 +17,7 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Component(service = DAOFactory.class, immediate = true)
 @Designate(ocd = DAOConfig.class)
@@ -318,6 +316,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         tradeModel.setPnl(rs.getDouble("pnl"));
         tradeModel.setTimeFrame(rs.getString("TIMEFRAME"));
         tradeModel.setStatus(TradeModel.Status.valueOf(rs.getString("status")));
+        tradeModel.setOrderType(rs.getString("orderType"));
         // try to set LTP/pnl_percentage if present
         try {
             double ltp = rs.getDouble("ltp");
@@ -570,6 +569,62 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     }
 
 
+    public Map<String, String> getInstrumentKeys(String... symbols) throws SQLException {
+        Map<String, String> result = new HashMap<>();
+        String QUERY =
+                "SELECT trading_symbol, instrument_key FROM nse_mtf_stocks WHERE trading_symbol IN (%s)";
+
+        if (symbols == null || symbols.length == 0) return result;
+
+        String inClause = String.join(",",
+                java.util.Arrays.stream(symbols).map(s -> "'" + s + "'").toArray(String[]::new));
+
+        String sql = String.format(QUERY, inClause);
+
+        try (Connection connection = conn(); Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                result.put(rs.getString("trading_symbol"), rs.getString("instrument_key"));
+            }
+        }
+        return result;
+    }
+
+    public void upsertWatchlistEntry(String symbol, String instrumentKey, String bestStrategy,
+                                     String eventType, String confidenceScore, String marketBias) throws Exception {
+
+        String sql = "INSERT INTO nifty500_watchlist " +
+                "(SYMBOL, INSTRUMENT_KEY, EVENT_TYPE, confindence_score, market_bias,COMPANY_NAME,Series) " +
+                "VALUES (?, ?, ?, ?, ?, ?,?) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "INSTRUMENT_KEY = VALUES(INSTRUMENT_KEY), " +
+                "BEST_STRATEGY = VALUES(BEST_STRATEGY), " +
+                "EVENT_TYPE = VALUES(EVENT_TYPE), " +
+                "confindence_score = VALUES(confindence_score), " +
+                "market_bias = VALUES(market_bias)";
+
+        try (Connection conn = conn();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, symbol);
+            ps.setString(2, instrumentKey.replaceAll("|",""));
+            ps.setString(3, eventType);
+            ps.setString(4, confidenceScore);
+            ps.setString(5, marketBias);
+            ps.setString(6, symbol);
+            ps.setString(7, "EQ");
+
+            ps.executeUpdate();
+            logger.info("Upserted watchlist entry: {}", symbol);
+
+        } catch (SQLException e) {
+            logger.error("Error upserting watchlist entry for symbol {}", symbol, e);
+            throw e;
+        }catch (Exception ex){
+            logger.error("General error upserting watchlist entry for symbol {}", symbol, ex);
+            throw ex;
+        }
+    }
 
 
 

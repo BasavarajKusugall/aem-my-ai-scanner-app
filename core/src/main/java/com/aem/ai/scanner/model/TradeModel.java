@@ -14,6 +14,7 @@ public class TradeModel {
             DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm:ss").withZone(IST_ZONE);
 
     private String tradeId;
+    private String orderType;
     private String timeFrame;
     private InstrumentSymbol symbol;
     public Signal.Side side; // BUY or SELL
@@ -199,10 +200,20 @@ public class TradeModel {
     public void setSymbol(InstrumentSymbol symbol) { this.symbol = symbol; }
     public void setTradeId(String tradeId) { this.tradeId = tradeId; }
 
+    public String getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(String orderType) {
+        this.orderType = orderType;
+    }
+
     @Override
     public String toString() {
-        return "Trade{" +
+        return "TradeModel{" +
                 "tradeId='" + tradeId + '\'' +
+                ", orderType='" + orderType + '\'' +
+                ", timeFrame='" + timeFrame + '\'' +
                 ", symbol=" + symbol +
                 ", side=" + side +
                 ", entryPrice=" + entryPrice +
@@ -210,11 +221,12 @@ public class TradeModel {
                 ", stopLoss=" + stopLoss +
                 ", target=" + target +
                 ", quantity=" + quantity +
-                ", entryTimeIST=" + getEntryTimeISTFormatted() +
-                ", exitTimeIST=" + getExitTimeISTFormatted() +
+                ", entryTime=" + entryTime +
+                ", exitTime=" + exitTime +
                 ", status=" + status +
                 ", pnl=" + pnl +
+                ", ltp=" + ltp +
+                ", pnlPercentage=" + pnlPercentage +
                 '}';
     }
-
 }

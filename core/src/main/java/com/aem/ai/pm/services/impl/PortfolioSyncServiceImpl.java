@@ -1,6 +1,6 @@
 package com.aem.ai.pm.services.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.config.PortfolioSyncConfig;
 import com.aem.ai.pm.connectors.BrokerConnector;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;

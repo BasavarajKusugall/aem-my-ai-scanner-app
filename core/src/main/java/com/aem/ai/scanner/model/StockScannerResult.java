@@ -77,76 +77,7 @@ public class StockScannerResult {
 }
 
 // === Base Stock Pick ===
-@JsonIgnoreProperties(ignoreUnknown = true)
-class StockPick {
-    @JsonProperty("stock")
-    private String stock;
 
-    @JsonProperty("nse_symbol")
-    private String nseSymbol;
 
-    @JsonProperty("instrument_key")
-    private String instrumentKey;
 
-    @JsonProperty("confidence_score")
-    private int confidenceScore;
 
-    @JsonProperty("live_price")
-    private double livePrice;
-
-    // Getters & Setters
-    public String getStock() { return stock; }
-    public void setStock(String stock) { this.stock = stock; }
-
-    public String getNseSymbol() { return nseSymbol; }
-    public void setNseSymbol(String nseSymbol) { this.nseSymbol = nseSymbol; }
-
-    public String getInstrumentKey() { return instrumentKey; }
-    public void setInstrumentKey(String instrumentKey) { this.instrumentKey = instrumentKey; }
-
-    public int getConfidenceScore() { return confidenceScore; }
-    public void setConfidenceScore(int confidenceScore) { this.confidenceScore = confidenceScore; }
-
-    public double getLivePrice() { return livePrice; }
-    public void setLivePrice(double livePrice) { this.livePrice = livePrice; }
-}
-
-// === Specialized Stock Types ===
-@JsonIgnoreProperties(ignoreUnknown = true)
-class TrendingStock extends StockPick {
-    @JsonProperty("trend_type")
-    private String trendType; // Uptrend / Downtrend / Sideways
-
-    public String getTrendType() { return trendType; }
-    public void setTrendType(String trendType) { this.trendType = trendType; }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-class VolumeStock extends StockPick {
-    @JsonProperty("volume_change_percent")
-    private double volumeChangePercent;
-
-    @JsonProperty("price_action")
-    private String priceAction; // Breakout / Breakdown / Gap Up / Gap Down
-
-    public double getVolumeChangePercent() { return volumeChangePercent; }
-    public void setVolumeChangePercent(double volumeChangePercent) { this.volumeChangePercent = volumeChangePercent; }
-
-    public String getPriceAction() { return priceAction; }
-    public void setPriceAction(String priceAction) { this.priceAction = priceAction; }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-class NewsStock extends StockPick {
-    @JsonProperty("news_type")
-    private String newsType; // Earnings / Corporate / Macro
-
-    @JsonProperty("expected_impact")
-    private String expectedImpact; // Positive / Negative / Neutral
-
-    public String getNewsType() { return newsType; }
-    public void setNewsType(String newsType) { this.newsType = newsType; }
-
-    public String getExpectedImpact() { return expectedImpact; }
-    public void setExpectedImpact(String expectedImpact) { this.expectedImpact = expectedImpact; }
-}

@@ -63,7 +63,6 @@ public class InstrumentSymbol {
     public String toString() {
         return "InstrumentSymbol{" +
                 "symbol='" + symbol + '\'' +
-                ", bestStrategy='" + bestStrategy + '\'' +
                 ", instrumentKey='" + instrumentKey + '\'' +
                 '}';
     }

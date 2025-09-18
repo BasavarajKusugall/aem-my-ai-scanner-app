@@ -6,6 +6,7 @@ import com.aem.ai.scanner.model.*;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface DAOFactory {
@@ -49,4 +50,9 @@ public interface DAOFactory {
 
     void closeTrade(String tradeId, double exitPrice, String reason, String tableName) throws SQLException;
     void insertOrUpdateTelegramConfig(TelegramConfig cfg);
+
+    Map<String, String> getInstrumentKeys(String... symbols) throws SQLException;
+
+    void upsertWatchlistEntry(String symbol, String instrumentKey, String bestStrategy,
+                              String eventType, String confidenceScore, String marketBias) throws Exception;
 }

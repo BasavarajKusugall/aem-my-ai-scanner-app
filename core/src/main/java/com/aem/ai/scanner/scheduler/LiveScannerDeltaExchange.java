@@ -1,6 +1,6 @@
 package com.aem.ai.scanner.scheduler;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.scanner.api.MarketDataService;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.dao.WatchlistDao;
@@ -13,6 +13,7 @@ import com.aem.ai.scanner.utils.Utils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
@@ -69,7 +70,8 @@ public class LiveScannerDeltaExchange implements Runnable {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, CachedStrategies> strategyCache = new ConcurrentHashMap<>();
-
+    private static final Map<String, PivotLevels> DAILY_PIVOT_LEVELS = new ConcurrentHashMap<>();
+    private static LocalDateTime lastPivotCalculation = null;
     @Reference
     private WatchlistDao watchlistDao;
 
@@ -179,6 +181,19 @@ public class LiveScannerDeltaExchange implements Runnable {
             if (candles == null || candles.isEmpty()) {
                 throw new RuntimeException("No candles returned");
             }
+            // ✅ Calculate daily pivots only once per day
+            boolean recalcRequired = lastPivotCalculation == null ||
+                    !lastPivotCalculation.toLocalDate().equals(LocalDateTime.now().toLocalDate());
+            if (StringUtils.equalsIgnoreCase(timeframe,"1d")){
+                if (recalcRequired){
+                    PivotLevels pivots = Utils.calculatePivotLevels(candles);
+                    if (pivots != null) {
+                        DAILY_PIVOT_LEVELS.put(symbol.getSymbol(), pivots);
+                        log.info("📊 Daily Pivot for {}: {}", symbol.getSymbol(), pivots);
+                    }
+
+                }
+            }
 
             tradesMonitor(symbol, candles);
 
@@ -187,7 +202,8 @@ public class LiveScannerDeltaExchange implements Runnable {
             // ✅ Collect signals for all strategies
             List<SignalResult> results = new ArrayList<>();
             for (StrategyConfig sc : strategies) {
-                Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe);
+                PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+                Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe, pivots);
                 opt.ifPresent(signal -> results.add(new SignalResult(sc, signal)));
             }
 
@@ -331,7 +347,7 @@ public class LiveScannerDeltaExchange implements Runnable {
         daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
 
         // Log beautifully formatted signal
-        log.info("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment));
+        log.debug("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment));
     }
 
     /**

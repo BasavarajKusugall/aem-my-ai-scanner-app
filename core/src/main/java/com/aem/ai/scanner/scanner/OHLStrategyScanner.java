@@ -8,5 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OHLStrategyScanner {
+    List<String> getOHLTimeFrameList();
     Optional<Signal> evaluateLatest(List<Candle> candles, String timeframe, InstrumentSymbol symbol);
 }

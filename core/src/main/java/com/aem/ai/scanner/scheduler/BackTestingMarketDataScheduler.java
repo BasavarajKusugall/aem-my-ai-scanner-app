@@ -1,6 +1,6 @@
 package com.aem.ai.scanner.scheduler;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.scanner.api.MarketDataService;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.dao.WatchlistDao;
@@ -141,12 +141,12 @@ public class BackTestingMarketDataScheduler implements Runnable {
         try {
             List<Candle> candles = svc.fetchCandles(symbol, timeframe, count, Timeframes.isHistoricalBucket(timeframe));
             if (candles.isEmpty()) {
-                log.warn("⚠️ No candles for {} {}", symbol, timeframe);
+                log.debug("⚠️ No candles for {} {}", symbol.getSymbol(), timeframe);
                 return;
             }
 
             evaluateStrategies(svc.brokerCode(), candles, symbol, timeframe);
-            log.info("✅ Completed backtest {} {} candles={}", symbol, timeframe, candles.size());
+            log.debug("✅ Completed backtest {} {} candles={}", symbol, timeframe, candles.size());
 
         } catch (Exception e) {
             log.error("❌ {} {} {} failed: {}", svc.brokerCode(), symbol, timeframe, e.getMessage(), e);
@@ -159,8 +159,8 @@ public class BackTestingMarketDataScheduler implements Runnable {
                                     List<Candle> candles,
                                     InstrumentSymbol symbol,
                                     String timeframe) throws Exception {
-        log.info("Evaluating strategies for {} {} with {} candles",
-                symbol, timeframe, candles.size());
+        log.debug("Evaluating strategies for {} {} with {} candles",
+                symbol.getSymbol(), timeframe, candles.size());
 
         RollingBarSeries rolling = new RollingBarSeries(symbol.getSymbol() + "_" + timeframe, candles.size());
         for (Candle c : candles) {
@@ -249,7 +249,7 @@ public class BackTestingMarketDataScheduler implements Runnable {
                     "text/html"
             );
 
-            log.info("✅ Reports stored in CRX for {} {}", symbol, timeframe);
+            log.info("✅ Reports stored in CRX for {} {}", symbol.getSymbol(), timeframe);
         } catch (Exception e) {
             log.error("❌ Failed to store reports for {} {}: {}", symbol, timeframe, e.getMessage(), e);
         }
@@ -257,7 +257,7 @@ public class BackTestingMarketDataScheduler implements Runnable {
         // ✅ Still print summary to logs
 
         // ✅ Print reports
-        log.info(printReport(tradingStatements));
+       // log.info(printReport(tradingStatements));
 
         // ✅ Best strategy summary
         Optional<TradingStatement> bestStatement = tradingStatements.stream()

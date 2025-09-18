@@ -1,4 +1,4 @@
-package com;
+package com.aem;
 
 public class GenericeConstants {
     public static final String MYSQL_PORTFOLIO_MGMT = "mysql-portfolio_mgmt";

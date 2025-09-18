@@ -1,6 +1,6 @@
 package com.aem.ai.pm.connectors.kite.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.connectors.kite.KiteAuthService;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.UserBrokerAccount;

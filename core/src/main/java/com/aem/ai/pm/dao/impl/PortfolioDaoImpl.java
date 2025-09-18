@@ -1,6 +1,6 @@
 package com.aem.ai.pm.dao.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dao.PortfolioDao;
 import com.aem.ai.pm.dto.*;

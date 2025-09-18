@@ -37,7 +37,7 @@ public class StrategyEngineImpl implements StrategyEngine {
     public Optional<Signal> evaluate(StrategyConfig cfg,
                                      List<Candle> candles,
                                      InstrumentSymbol symbol,
-                                     String timeframe) {
+                                     String timeframe, PivotLevels pivots) {
         long start = System.nanoTime();
         if (candles == null || candles.isEmpty()) {
             log.debug(YELLOW + "[{} {}] No candles available" + RESET, symbol, timeframe);
@@ -88,7 +88,12 @@ public class StrategyEngineImpl implements StrategyEngine {
 
                 double entryPrice = candles.get(candles.size() - 1).getClose();
                 boolean isBuy = true; // or false for short
-
+                // ✅ Pivot validation
+                if (!validateWithPivots(side, entryPrice, pivots)) {
+                    log.info(YELLOW + "[{} {}] Signal rejected by pivot validation (price={}, pivot={})" + RESET,
+                            symbol, cfg.getName(), entryPrice, pivots != null ? pivots.getPivot() : null);
+                    return Optional.empty();
+                }
                 double[] sltp = StopLossTargetCalculator.computeSLTP(series,
                         14,   // ATR period
                         10,   // Swing lookback
@@ -97,7 +102,7 @@ public class StrategyEngineImpl implements StrategyEngine {
                         isBuy);
 
                 double stopLoss = sltp[0];
-                double target   = sltp[1];
+                double target = sltp[1];
                /* double stopLoss = computeStopLoss(primaryRule, entryPrice, side, series);
                 double target   = computeTarget(primaryRule, entryPrice, side, series);*/
                 double confidence = computeConfidence(cfg, series, entryPrice, stopLoss, target);
@@ -159,6 +164,16 @@ public class StrategyEngineImpl implements StrategyEngine {
         log.info(CYAN + "[{} {}] Total evaluation time: {} ms" + RESET,
                 symbol, cfg.getName(), (System.nanoTime() - start) / 1_000_000);
         return Optional.empty();
+    }
+    private boolean validateWithPivots(Signal.Side side, double entryPrice, PivotLevels pivots) {
+        if (pivots == null) return true; // no pivots = skip validation
+
+        if (side == Signal.Side.BUY) {
+            return entryPrice < pivots.getR1();//todo: entry price should be below R1 for buy
+        } else if (side == Signal.Side.SELL) {
+            return entryPrice < pivots.getPivot();
+        }
+        return true;
     }
 
     @Override
@@ -237,8 +252,9 @@ public class StrategyEngineImpl implements StrategyEngine {
             try {
                 Ta4jService.IndicatorsSnapshot snap = ta4jService.computeIndicators(series);
                 double atr = snap != null ? snap.atr : Double.NaN;
-                if (!Double.isNaN(atr)) return (side == Signal.Side.BUY) ? entryPrice - atr * rule.getStopLossAtrMultiplier()
-                        : entryPrice + atr * rule.getStopLossAtrMultiplier();
+                if (!Double.isNaN(atr))
+                    return (side == Signal.Side.BUY) ? entryPrice - atr * rule.getStopLossAtrMultiplier()
+                            : entryPrice + atr * rule.getStopLossAtrMultiplier();
             } catch (Exception e) {
                 log.debug("ATR compute failed: {}", e.getMessage());
             }
@@ -259,8 +275,9 @@ public class StrategyEngineImpl implements StrategyEngine {
             try {
                 Ta4jService.IndicatorsSnapshot snap = ta4jService.computeIndicators(series);
                 double atr = snap != null ? snap.atr : Double.NaN;
-                if (!Double.isNaN(atr)) return (side == Signal.Side.BUY) ? entryPrice + atr * rule.getTakeProfitAtrMultiplier()
-                        : entryPrice - atr * rule.getTakeProfitAtrMultiplier();
+                if (!Double.isNaN(atr))
+                    return (side == Signal.Side.BUY) ? entryPrice + atr * rule.getTakeProfitAtrMultiplier()
+                            : entryPrice - atr * rule.getTakeProfitAtrMultiplier();
             } catch (Exception e) {
                 log.debug("ATR compute failed: {}", e.getMessage());
             }

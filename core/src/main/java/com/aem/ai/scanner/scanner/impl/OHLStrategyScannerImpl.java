@@ -2,6 +2,7 @@ package com.aem.ai.scanner.scanner.impl;
 
 import com.aem.ai.scanner.model.Candle;
 import com.aem.ai.scanner.model.InstrumentSymbol;
+import com.aem.ai.scanner.model.PivotLevels;
 import com.aem.ai.scanner.model.Signal;
 import com.aem.ai.scanner.scanner.OHLStrategyScanner;
 import com.aem.ai.scanner.services.Ta4jService;
@@ -49,6 +50,9 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
     @Reference
     private Ta4jService ta4jService;
 
+    private List<String> ohlTimeFrameList = new ArrayList<>();
+
+
     @ObjectClassDefinition(
             name = "OHL (Open=High/Low) Strategy Service",
             description = "Enable/disable OHL scanner with pivot-level filters and Telegram alerts"
@@ -71,6 +75,9 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
 
         @AttributeDefinition(name = "Enable Telegram Alerts")
         boolean enableTelegram() default true;
+
+        @AttributeDefinition(name = "OHL scanner timeframes")
+        String ohl_scanner_tf() default "1m,3m,5m,10m";
     }
 
     @Activate
@@ -78,6 +85,9 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
     protected void activate(Config cfg) {
         long start = System.currentTimeMillis();
         this.config = cfg;
+        if (cfg.ohl_scanner_tf()!=null){
+            ohlTimeFrameList = Arrays.stream(cfg.ohl_scanner_tf().split(",")).toList();
+        }
         log.info(CYAN + "✅ OHLStrategyService activated" + RESET +
                         " (enable={}, tol={}, atrBreak={}, vol={}, pivot={}, telegram={}) [{}ms]",
                 cfg.enable(), cfg.tolerancePct(), cfg.atrBreakFactor(),
@@ -92,18 +102,7 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
     }
 
     // --- Pivot Levels calculator
-    public static class PivotLevels {
-        public final double pivot, r1, r2, r3, s1, s2, s3;
-        public PivotLevels(double high, double low, double close) {
-            pivot = (high + low + close) / 3.0;
-            r1 = (2 * pivot) - low;
-            s1 = (2 * pivot) - high;
-            r2 = pivot + (high - low);
-            s2 = pivot - (high - low);
-            r3 = high + 2 * (pivot - low);
-            s3 = low - 2 * (high - pivot);
-        }
-    }
+
 
     /** Convert List<Candle> -> BarSeries with logging */
     private BarSeries buildSeries(String name, List<Candle> candles, Duration barDuration) {
@@ -254,8 +253,8 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
         double entry = signal.getEntryPrice();
 
         boolean ok = signal.getSide() == Signal.Side.BUY
-                ? entry < pivots.r1
-                : entry > pivots.s1;
+                ? entry < pivots.getR1()
+                : entry > pivots.getS1();
 
         log.debug(BLUE + "ℹ️ Pivot check {} [{}ms]" + RESET, ok, System.currentTimeMillis() - start);
         return ok;
@@ -281,4 +280,10 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
             return Math.abs(open - high) <= open * tolerance;
         }
     }
+
+    public List<String> getOHLTimeFrameList() {
+        return ohlTimeFrameList;
+    }
+
+
 }

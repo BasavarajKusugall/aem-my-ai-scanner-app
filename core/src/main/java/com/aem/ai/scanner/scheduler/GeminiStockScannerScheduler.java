@@ -1,25 +1,21 @@
 package com.aem.ai.scanner.scheduler;
 
-
-import com.aem.ai.scanner.model.StockScannerResult;
+import com.aem.GenericeConstants;
+import com.aem.ai.scanner.dao.DAOFactory;
+import com.aem.ai.scanner.model.*;
 import com.aem.ai.scanner.services.GeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.osgi.service.component.annotations.*;
-import org.apache.sling.commons.scheduler.Scheduler;
-import org.osgi.service.metatype.annotations.AttributeDefinition;
-import org.osgi.service.metatype.annotations.Designate;
-import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.metatype.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @Component(
         service = Runnable.class,
         immediate = true
-
 )
 @Designate(ocd = GeminiStockScannerScheduler.Config.class)
 public class GeminiStockScannerScheduler implements Runnable {
@@ -30,7 +26,7 @@ public class GeminiStockScannerScheduler implements Runnable {
     private GeminiService geminiService;
 
     @Reference
-    private Scheduler scheduler;
+    private DAOFactory daoFactory;
 
     private volatile boolean enabled = true;
 
@@ -67,18 +63,83 @@ public class GeminiStockScannerScheduler implements Runnable {
         log.info("Running Gemini Stock Scanner Scheduler at {}", LocalDateTime.now());
 
         try {
-            // Call the new service method
             StockScannerResult result = geminiService.runStockScanner();
 
-            log.info("Stock scanner result parsed successfully. Market Bias: {}", result.getMarketBias());
-            log.debug("Full JSON: {}", mapper.writeValueAsString(result));
+            // Collect all NSE symbols
+            Set<String> symbols = new HashSet<>();
+            collectSymbols(result, symbols);
+            if (symbols.isEmpty()) {
+                log.warn("No stock picks found by Gemini Stock Scanner. Exiting.");
+                return;
+            }
 
-            // TODO: persist result or trigger downstream workflow
+            // Get instrument keys
+            Map<String, String> instrumentMap = daoFactory.getInstrumentKeys(symbols.toArray(new String[0]));
+
+            if (instrumentMap.isEmpty()) {
+                log.warn("No instrument keys found for symbols: {}. Exiting.", symbols);
+                return;
+            }
+            // Enrich and persist
+            persistPicks(result.getTopIntradayPicks(), "INTRADAY", result.getMarketBias(), instrumentMap);
+            persistPicks(result.getTopBtstPicks(), "BTST", result.getMarketBias(), instrumentMap);
+            persistPicks(result.getTrendingStocks(), "TRENDING", result.getMarketBias(), instrumentMap);
+            persistPicks(result.getVolumeBuildUpStocks(), "VOLUME", result.getMarketBias(), instrumentMap);
+            persistPicks(result.getNewsBasedStocks(), "NEWS", result.getMarketBias(), instrumentMap);
+
+            log.info("Stock scanner result persisted successfully. Market Bias: {}", result.getMarketBias());
 
         } catch (Exception e) {
             log.error("Error running Gemini Stock Scanner Scheduler", e);
         }
 
         log.info("Finished Gemini Stock Scanner Scheduler at {}", LocalDateTime.now());
+    }
+
+    private void collectSymbols(StockScannerResult result, Set<String> symbols) {
+        if (result.getTopIntradayPicks() != null) {
+            result.getTopIntradayPicks().forEach(p -> symbols.add(p.getNseSymbol()));
+        }
+        if (result.getTopBtstPicks() != null) {
+            result.getTopBtstPicks().forEach(p -> symbols.add(p.getNseSymbol()));
+        }
+        if (result.getTrendingStocks() != null) {
+            result.getTrendingStocks().forEach(p -> symbols.add(p.getNseSymbol()));
+        }
+        if (result.getVolumeBuildUpStocks() != null) {
+            result.getVolumeBuildUpStocks().forEach(p -> symbols.add(p.getNseSymbol()));
+        }
+        if (result.getNewsBasedStocks() != null) {
+            result.getNewsBasedStocks().forEach(p -> symbols.add(p.getNseSymbol()));
+        }
+    }
+
+    private void persistPicks(List<? extends StockPick> picks, String strategy,
+                              String marketBias, Map<String, String> instrumentMap) {
+        if (picks == null) return;
+
+        picks.forEach(p -> {
+            try {
+                String symbol = p.getNseSymbol();
+                String instrumentKey = instrumentMap.getOrDefault(symbol, p.getInstrumentKey());
+                if (instrumentKey == null || instrumentKey.isEmpty()) {
+                    log.warn("No instrument key found for symbol: {}. Skipping.", symbol);
+                    return;
+                }
+                instrumentKey = instrumentKey.replaceFirst("^NSE_EQ\\|", "");
+                p.setInstrumentKey(instrumentKey);
+
+                daoFactory.upsertWatchlistEntry(
+                        symbol,
+                        instrumentKey,
+                        "SCANNER",
+                        strategy,
+                        String.valueOf(p.getConfidenceScore()),
+                        marketBias
+                );
+            } catch (Exception ex) {
+                log.error("Failed to upsert {} pick: {}", strategy, p.getNseSymbol(), ex);
+            }
+        });
     }
 }

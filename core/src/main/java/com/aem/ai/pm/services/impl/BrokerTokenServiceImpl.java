@@ -1,6 +1,6 @@
 package com.aem.ai.pm.services.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.BrokerToken;
 import com.aem.ai.pm.dto.UserBrokerAccount;

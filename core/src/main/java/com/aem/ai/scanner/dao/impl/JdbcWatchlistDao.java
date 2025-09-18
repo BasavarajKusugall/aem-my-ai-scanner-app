@@ -1,6 +1,6 @@
 package com.aem.ai.scanner.dao.impl;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.scanner.dao.WatchlistDao;
 import com.aem.ai.scanner.model.InstrumentSymbol;
@@ -75,7 +75,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
 
     private List<InstrumentSymbol> read(String table, String type) {
         List<InstrumentSymbol> watchlist = new ArrayList<>();
-        String sql = "SELECT * FROM " + table +" WHERE BEST_STRATEGY IS NOT NULL";
+        String sql = "SELECT * FROM " + table ;
 
         DataSource dataSource = getDataSource();
         if (dataSource == null) {

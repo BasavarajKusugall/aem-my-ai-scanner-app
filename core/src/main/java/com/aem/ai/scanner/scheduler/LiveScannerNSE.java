@@ -1,6 +1,6 @@
 package com.aem.ai.scanner.scheduler;
 
-import com.GenericeConstants;
+import com.aem.GenericeConstants;
 import com.aem.ai.scanner.api.MarketDataService;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.dao.WatchlistDao;
@@ -9,6 +9,7 @@ import com.aem.ai.scanner.scanner.OHLStrategyScanner;
 import com.aem.ai.scanner.services.GeminiService;
 import com.aem.ai.scanner.services.StrategyEngine;
 import com.aem.ai.scanner.services.TelegramService;
+import com.aem.ai.scanner.services.impl.NSEMarketOpenStatusService;
 import com.aem.ai.scanner.utils.Timeframes;
 import com.aem.ai.scanner.utils.Utils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -65,6 +66,8 @@ public class LiveScannerNSE implements Runnable {
 
         @AttributeDefinition(name = "Trades table name")
         String trades_table() default "stock_trades";
+
+
     }
 
     private volatile Config config;
@@ -90,9 +93,14 @@ public class LiveScannerNSE implements Runnable {
     @Reference
     private OHLStrategyScanner ohlStrategyScanner;
 
+    @Reference
+    private NSEMarketOpenStatusService nseMarketOpenStatusService;
+
 
 
     private final Map<String, MarketDataService> servicesByBroker = new ConcurrentHashMap<>();
+    private static final Map<String, PivotLevels> DAILY_PIVOT_LEVELS = new ConcurrentHashMap<>();
+    private static LocalDateTime lastPivotCalculation = null;
 
     @Reference(
             service = MarketDataService.class,
@@ -119,6 +127,7 @@ public class LiveScannerNSE implements Runnable {
     @Modified
     protected void activate(Config cfg) {
         this.config = cfg;
+
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         log.info("✅ LiveScannerNSE activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
     }
@@ -132,6 +141,11 @@ public class LiveScannerNSE implements Runnable {
     @Override
     public void run() {
         try {
+            boolean isMarketClose = Utils.isMarketClose();
+            if (isMarketClose){
+                log.error(" Market is closed. Skipping this run.");
+                return;
+            }
             log.info("💡 LiveScannerNSE scheduler triggered at {}", LocalDateTime.now());
             doRun(); // move your original run() logic into doRun()
             // reset scheduler-level failures on success
@@ -145,7 +159,7 @@ public class LiveScannerNSE implements Runnable {
         }
     }
 
-    private void doRun() {
+    private void doRun() throws Exception {
         if (config == null || !config.enable()) {
             log.debug("Scheduler disabled");
             return;
@@ -163,6 +177,7 @@ public class LiveScannerNSE implements Runnable {
             return;
         }
 
+
         MarketDataService svc = servicesByBroker.get(GenericeConstants.UPSTOX);
         if (svc == null) {
             log.warn("No MarketDataService for broker {}", GenericeConstants.UPSTOX);
@@ -174,6 +189,7 @@ public class LiveScannerNSE implements Runnable {
                 fetchAndProcess(svc, symbol, tf.getKey(), tf.getValue(), 0);
             }
         }
+        lastPivotCalculation = LocalDateTime.now();
     }
 
     private void fetchAndProcess(MarketDataService svc, InstrumentSymbol symbol,
@@ -184,7 +200,25 @@ public class LiveScannerNSE implements Runnable {
             if (candles == null || candles.isEmpty()) {
                 throw new RuntimeException("No candles returned");
             }
-            if (StringUtils.containsIgnoreCase(timeframe,"m")){
+            // ✅ Calculate daily pivots only once per day
+            boolean recalcRequired = lastPivotCalculation == null ||
+                    !lastPivotCalculation.toLocalDate().equals(LocalDateTime.now().toLocalDate());
+            if (StringUtils.equalsIgnoreCase(timeframe,"1d")){
+                if (recalcRequired){
+                    PivotLevels pivots = Utils.calculatePivotLevels(candles);
+                    if (pivots != null) {
+                        DAILY_PIVOT_LEVELS.put(symbol.getSymbol(), pivots);
+                        log.info("📊 Daily Pivot for {}: {}", symbol.getSymbol(), pivots);
+                    }
+
+                }
+            }
+            tradesMonitor(symbol, candles);
+            log.info("Fetched {} candles for {} {} (attempt={})",
+                    candles.size(), symbol.getSymbol(), timeframe, attempt + 1);
+
+            List<String> ohlTimeFrameList = ohlStrategyScanner.getOHLTimeFrameList();
+            if (ohlTimeFrameList.contains(timeframe)){
                 log.info( " Check for the OHL scanner " );
                 Optional<Signal> ohlcSignal = ohlStrategyScanner.evaluateLatest(candles, timeframe,  symbol);
                 if (null != ohlcSignal && ohlcSignal.isPresent()) {
@@ -197,19 +231,22 @@ public class LiveScannerNSE implements Runnable {
                 }
             }
 
-
-            tradesMonitor(symbol, candles);
-
             List<StrategyConfig> strategies = parseStrategiesCached(symbol);
 
             // ✅ Collect signals for all strategies
             List<SignalResult> results = new ArrayList<>();
             for (StrategyConfig sc : strategies) {
-                Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe);
+                PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+                Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe, pivots);
                 opt.ifPresent(signal -> results.add(new SignalResult(sc, signal)));
             }
 
             // ✅ Pick the best signal (based on your ranking logic)
+            if (results.isEmpty()) {
+                log.info("No signals generated for {} {} (candles={}, strategies={})",
+                        symbol.getSymbol(), timeframe, candles.size(), strategies.size());
+                return;
+            }
             results.stream()
                     .max(Comparator.comparingDouble(r -> r.signal.getScore())) // Example: highest score
                     .ifPresent(best -> {
@@ -267,8 +304,18 @@ public class LiveScannerNSE implements Runnable {
                 boolean hitStop = (t.getSide() == Signal.Side.BUY && ltp <= t.getStopLoss())
                         || (t.getSide() == Signal.Side.SELL && ltp >= t.getStopLoss());
 
-                if (hitTarget || hitStop) {
-                    double exitPrice = hitTarget ? t.getTarget() : t.getStopLoss();
+
+                MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
+                boolean closed = marketStatus != null && StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), "CLOSED");
+
+                boolean misClose = closed && StringUtils.equalsIgnoreCase(t.getOrderType(), "MIS");
+                if (hitTarget || hitStop || misClose) {
+                    double exitPrice = t.getTarget();
+                    if (hitStop){
+                        exitPrice =  t.getStopLoss();
+                    }else if (misClose){
+                        exitPrice = ltp;
+                    }
                     t.setExitPrice(exitPrice);
                     t.setExitTime(LocalDateTime.now());
                     double pnl = (t.getSide() == Signal.Side.BUY)
@@ -290,6 +337,10 @@ public class LiveScannerNSE implements Runnable {
     private List<StrategyConfig> parseStrategiesCached(InstrumentSymbol symbol) {
         String json = symbol.getBestStrategy();
         if (json == null || json.isEmpty()) return Collections.emptyList();
+
+        if (StringUtils.equalsIgnoreCase(json, "SCANNER")) {
+            return Collections.emptyList();
+        }
 
         CachedStrategies cached = strategyCache.get(symbol.getSymbol());
         if (cached != null && Objects.equals(cached.hash, Integer.toString(json.hashCode()))) {
@@ -343,9 +394,15 @@ public class LiveScannerNSE implements Runnable {
             return;
         }
         // Generate trade analysis
+        PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+        if (pivots != null) {
+            signalMsg += String.format("\nPivots: P=%.2f R1=%.2f S1=%.2f",
+                    pivots.getPivot(), pivots.getR1(), pivots.getS1());
+        }
         TradeAnalysis tradeAnalysis = geminiService.tradeSignalAnalysis(
-                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg)
+                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg,pivots)
         );
+
         telegram.sendMessageDailyStocksAlerts(signalMsg);
 
         // Insert trade into database
@@ -353,7 +410,7 @@ public class LiveScannerNSE implements Runnable {
         daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
 
         // Log beautifully formatted signal
-        log.info("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg));
+        log.debug("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg));
     }
 
     /**
@@ -385,5 +442,11 @@ public class LiveScannerNSE implements Runnable {
             this.hash = hash;
             this.strategies = strategies;
         }
+    }
+
+
+
+    public static PivotLevels getPivotLevels(String symbol) {
+        return DAILY_PIVOT_LEVELS.get(symbol);
     }
 }
