@@ -15,7 +15,7 @@ public interface DAOFactory {
     List<InstrumentSymbol> readWatchlistFromDb();
 
     // Insert trade
-    void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis, String tableName) throws SQLException;
+    void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis, String tableName, PivotLevels pivots) throws SQLException;
 
     // Find trade
     Optional<TradeModel> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side, String tableName) throws SQLException;

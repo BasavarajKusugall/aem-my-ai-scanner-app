@@ -16,6 +16,7 @@ public class TradeModel {
     private String tradeId;
     private String orderType;
     private String timeFrame;
+    private String reason;
     private InstrumentSymbol symbol;
     public Signal.Side side; // BUY or SELL
     private double entryPrice;
@@ -206,6 +207,14 @@ public class TradeModel {
 
     public void setOrderType(String orderType) {
         this.orderType = orderType;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
     }
 
     @Override

@@ -325,6 +325,11 @@ public class LiveScannerDeltaExchange implements Runnable {
             return;
         }
 
+        PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+        if (pivots != null) {
+            comment += String.format("\nPivots: P=%.2f R1=%.2f S1=%.2f",
+                    pivots.getPivot(), pivots.getR1(), pivots.getS1());
+        }
         // Create new trade model
         TradeModel trade = new TradeModel(symbol, signal.getSide(),
                 signal.getEntryPrice(), signal.getStopLoss(), signal.getTarget(), 1);
@@ -343,7 +348,7 @@ public class LiveScannerDeltaExchange implements Runnable {
         }
 
         // Insert trade into database
-        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table());
+        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table(), pivots);
         daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
 
         // Log beautifully formatted signal

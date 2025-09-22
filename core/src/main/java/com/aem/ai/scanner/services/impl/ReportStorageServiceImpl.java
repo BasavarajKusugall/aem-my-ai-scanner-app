@@ -6,7 +6,11 @@ import org.apache.sling.api.resource.*;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.jcr.Binary;
+import javax.jcr.Session;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -14,11 +18,11 @@ import java.util.*;
 
 @Component(
         service = ReportStorageService.class,
-        immediate = true,
         configurationPid = "com.aem.ai.scanner.config.ReportStorageConfig"
 )
 public class ReportStorageServiceImpl implements ReportStorageService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ReportStorageServiceImpl.class);
 
     @Reference
     private ResolverService resolverService;
@@ -32,56 +36,64 @@ public class ReportStorageServiceImpl implements ReportStorageService {
     }
 
     @Override
-    public void storeReport(String basePath,
+    public void storeReport(String overrideBasePath,
                             String fileName,
                             String content,
                             String mimeType) throws Exception {
 
         try (ResourceResolver resolver = resolverService.getServiceResolver()) {
-            // Ensure base folder exists
-            String folderPath = basePath != null ? basePath : "/var/mytrades";
+            // Resolve base path (prefer method param, else OSGi config, else default)
+            String folderPath = overrideBasePath != null ? overrideBasePath : this.basePath;
+            if (folderPath == null || folderPath.isEmpty()) {
+                folderPath = "/var/mytrades";
+            }
+
+            // Create folder structure by date: /base/yyyy/MM/dd
             folderPath += "/" + LocalDate.now().getYear() + "/"
                     + String.format("%02d", LocalDate.now().getMonthValue()) + "/"
                     + String.format("%02d", LocalDate.now().getDayOfMonth());
 
-            Resource folderRes = resolver.getResource(folderPath);
-            if (folderRes == null) {
-                folderRes = ResourceUtil.getOrCreateResource(resolver, folderPath,
-                        Collections.singletonMap("jcr:primaryType", "sling:Folder"),
-                        null, true);
-            }
+            Resource folderRes = ResourceUtil.getOrCreateResource(resolver, folderPath,
+                    Collections.singletonMap("jcr:primaryType", "sling:Folder"),
+                    null, true);
 
-            // File resource path
+            // File resource
             String filePath = folderPath + "/" + fileName;
-            Resource fileRes = resolver.getResource(filePath);
-            if (fileRes == null) {
-                fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
-                        Collections.singletonMap("jcr:primaryType", "nt:file"),
-                        null, true);
-            }
+            Resource fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
+                    Collections.singletonMap("jcr:primaryType", "nt:file"),
+                    null, true);
 
-            // jcr:content node
+            // jcr:content node under file
             String contentPath = filePath + "/jcr:content";
-            Resource contentRes = resolver.getResource(contentPath);
-            if (contentRes == null) {
-                contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
-                        Collections.singletonMap("jcr:primaryType", "nt:resource"),
-                        null, true);
-            }
+            Resource contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
+                    Collections.singletonMap("jcr:primaryType", "nt:resource"),
+                    null, true);
 
-            // Set properties
+            // Set binary properties
             ModifiableValueMap props = contentRes.adaptTo(ModifiableValueMap.class);
             if (props != null) {
-                props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
+                Session session = resolver.adaptTo(Session.class);
+                if (session != null) {
+                    Binary binary = session.getValueFactory().createBinary(
+                            new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))
+                    );
+                    props.put("jcr:data", binary);
+                } else {
+                    LOG.warn("Could not adapt resolver to Session, storing plain bytes for {}", filePath);
+                    props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
+                }
+
                 props.put("jcr:mimeType", mimeType);
                 props.put("jcr:lastModified", Calendar.getInstance());
             }
 
             resolver.commit();
+            LOG.info("Report stored successfully at {}", filePath);
+        } catch (Exception e) {
+            LOG.error("Error storing report: {}", fileName, e);
+            throw e;
         }
     }
-
-
 
     @ObjectClassDefinition(
             name = "Report Storage Configuration",

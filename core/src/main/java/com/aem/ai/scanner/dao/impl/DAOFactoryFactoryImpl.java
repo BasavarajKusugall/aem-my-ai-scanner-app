@@ -111,13 +111,13 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
 
 
     // -------------------- INSERT TRADE --------------------
-    public void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis,  String tableName) throws SQLException {
+    public void insertTrade(TradeModel t, TradeAnalysis tradeAnalysis, String tableName, PivotLevels pivots) throws SQLException {
         String sql = "INSERT INTO "+tableName+"(" +
                 "instrument_key, symbol, side, entry_price, ltp, stop_loss, target, quantity, entry_time, " +
                 "exit_price, exit_time, status, pnl, orderType, TIMEFRAME, " +
                 "confidence_score, global_news_sentiment, market_trend, open_interest_build_up, " +
-                "recommended_trade_timeframe, can_take_trade, final_verdict, GeminiAnalysis" +
-                ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                "recommended_trade_timeframe, can_take_trade, final_verdict, GeminiAnalysis,R1,R2,R3,S1,S2,S3" +
+                ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             if (StringUtils.containsIgnoreCase(tableName,"currency_trades")){
@@ -157,6 +157,13 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             } else {
                 for (int i = 16; i <= 23; i++) ps.setNull(i, Types.VARCHAR);
             }
+            ps.setDouble(24, safeDouble(pivots != null ? pivots.getR1() : null));
+            ps.setDouble(25, safeDouble(pivots != null ? pivots.getR2() : null));
+            ps.setDouble(26, safeDouble(pivots != null ? pivots.getR3() : null));
+            ps.setDouble(27, safeDouble(pivots != null ? pivots.getS1() : null));
+            ps.setDouble(28, safeDouble(pivots != null ? pivots.getS2() : null));
+            ps.setDouble(29, safeDouble(pivots != null ? pivots.getS3() : null));
+
 
             int rows = ps.executeUpdate();
             logger.info("Inserted trade into DB. Rows affected: {}", rows);
@@ -205,7 +212,12 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
 
 
     public void closeTradeWithPnl(TradeModel t, String tableName) throws SQLException {
-        String sql = "UPDATE "+tableName+" SET status = 'CLOSED', exit_price = ?, exit_time = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
+        String sql = "UPDATE "+tableName+" SET status = 'CLOSED', exit_price = ?, exit_time = ?, pnl = ?, last_updated = CURRENT_TIMESTAMP";
+        String reason = t.getReason();
+        if (StringUtils.isNotEmpty(reason)){
+            sql += ", Reason = '" + reason.replace("'", "''") + "'";
+        }
+        sql += " WHERE trade_id = ?";
         try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, t.getExitPrice());
             ps.setTimestamp(2, Timestamp.valueOf(t.getExitTime()));

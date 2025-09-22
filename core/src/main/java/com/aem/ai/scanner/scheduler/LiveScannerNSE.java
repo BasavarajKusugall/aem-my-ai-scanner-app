@@ -235,8 +235,8 @@ public class LiveScannerNSE implements Runnable {
 
             // ✅ Collect signals for all strategies
             List<SignalResult> results = new ArrayList<>();
+            PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
             for (StrategyConfig sc : strategies) {
-                PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
                 Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe, pivots);
                 opt.ifPresent(signal -> results.add(new SignalResult(sc, signal)));
             }
@@ -315,6 +315,7 @@ public class LiveScannerNSE implements Runnable {
                         exitPrice =  t.getStopLoss();
                     }else if (misClose){
                         exitPrice = ltp;
+                        t.setReason("Market closed -FORCE  MIS exit");
                     }
                     t.setExitPrice(exitPrice);
                     t.setExitTime(LocalDateTime.now());
@@ -406,7 +407,7 @@ public class LiveScannerNSE implements Runnable {
         telegram.sendMessageDailyStocksAlerts(signalMsg);
 
         // Insert trade into database
-        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table());
+        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table(),pivots);
         daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
 
         // Log beautifully formatted signal
