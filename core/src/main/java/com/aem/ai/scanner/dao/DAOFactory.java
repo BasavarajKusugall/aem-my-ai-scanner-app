@@ -55,4 +55,6 @@ public interface DAOFactory {
 
     void upsertWatchlistEntry(String symbol, String instrumentKey, String bestStrategy,
                               String eventType, String confidenceScore, String marketBias) throws Exception;
+
+    List<TradeModel> listForceClosedTradesForSymbol(String symbol,String tableName) throws SQLException;
 }

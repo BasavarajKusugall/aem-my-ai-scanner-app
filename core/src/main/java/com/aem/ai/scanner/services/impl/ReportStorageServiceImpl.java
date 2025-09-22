@@ -42,53 +42,52 @@ public class ReportStorageServiceImpl implements ReportStorageService {
                             String mimeType) throws Exception {
 
         try (ResourceResolver resolver = resolverService.getServiceResolver()) {
-            // Resolve base path (prefer method param, else OSGi config, else default)
             String folderPath = overrideBasePath != null ? overrideBasePath : this.basePath;
-            if (folderPath == null || folderPath.isEmpty()) {
-                folderPath = "/var/mytrades";
-            }
+            if (folderPath == null || folderPath.isEmpty()) folderPath = "/var/mytrades";
 
-            // Create folder structure by date: /base/yyyy/MM/dd
+            // Create dated folder: /base/yyyy/MM/dd
             folderPath += "/" + LocalDate.now().getYear() + "/"
                     + String.format("%02d", LocalDate.now().getMonthValue()) + "/"
                     + String.format("%02d", LocalDate.now().getDayOfMonth());
 
             Resource folderRes = ResourceUtil.getOrCreateResource(resolver, folderPath,
-                    Collections.singletonMap("jcr:primaryType", "sling:Folder"),
-                    null, true);
+                    Collections.singletonMap("jcr:primaryType", "sling:Folder"), null, true);
 
-            // File resource
+            // Ensure nt:file node exists
             String filePath = folderPath + "/" + fileName;
-            Resource fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
-                    Collections.singletonMap("jcr:primaryType", "nt:file"),
-                    null, true);
+            Resource fileRes = resolver.getResource(filePath);
+            if (fileRes == null) {
+                fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
+                        Collections.singletonMap("jcr:primaryType", "nt:file"), null, true);
+            }
 
-            // jcr:content node under file
+            // Ensure jcr:content exists under nt:file
             String contentPath = filePath + "/jcr:content";
-            Resource contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
-                    Collections.singletonMap("jcr:primaryType", "nt:resource"),
-                    null, true);
+            Resource contentRes = resolver.getResource(contentPath);
+            if (contentRes == null) {
+                contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
+                        Collections.singletonMap("jcr:primaryType", "nt:resource"), null, true);
+            }
 
-            // Set binary properties
+            // Set properties on jcr:content
             ModifiableValueMap props = contentRes.adaptTo(ModifiableValueMap.class);
             if (props != null) {
                 Session session = resolver.adaptTo(Session.class);
                 if (session != null) {
-                    Binary binary = session.getValueFactory().createBinary(
-                            new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))
-                    );
+                    Binary binary = session.getValueFactory()
+                            .createBinary(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
                     props.put("jcr:data", binary);
                 } else {
-                    LOG.warn("Could not adapt resolver to Session, storing plain bytes for {}", filePath);
                     props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
+                    LOG.warn("Storing plain bytes for {}", filePath);
                 }
-
                 props.put("jcr:mimeType", mimeType);
                 props.put("jcr:lastModified", Calendar.getInstance());
             }
 
             resolver.commit();
             LOG.info("Report stored successfully at {}", filePath);
+
         } catch (Exception e) {
             LOG.error("Error storing report: {}", fileName, e);
             throw e;
@@ -97,10 +96,9 @@ public class ReportStorageServiceImpl implements ReportStorageService {
 
     @ObjectClassDefinition(
             name = "Report Storage Configuration",
-            description = "Configures where reports are stored in AEM"
+            description = "Configures where reports will be stored in AEM"
     )
     public @interface ReportStorageConfig {
-
         @AttributeDefinition(
                 name = "Base Path",
                 description = "Base repository path where reports will be stored (e.g. /var/mytrades)"

@@ -38,7 +38,7 @@ public class GeminiStockScannerScheduler implements Runnable {
         boolean scheduler_enabled() default true;
 
         @AttributeDefinition(name="Cron expression")
-        String scheduler_expression() default "0 0/3 * * * ?";
+        String scheduler_expression() default "0 0,30 9-13 ? * MON-FRI";
 
         @AttributeDefinition(name = "Allow concurrent execution")
         boolean scheduler_concurrent() default false;

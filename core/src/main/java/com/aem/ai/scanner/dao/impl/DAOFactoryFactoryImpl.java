@@ -142,7 +142,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             else ps.setNull(11, Types.TIMESTAMP);
             ps.setString(12, t.getStatus().toString());
             ps.setDouble(13,t.getPnl());
-            ps.setString(14, StringUtils.contains(t.getTimeFrame(), "m") ? "MIS" : "CNC");
+            ps.setString(14, StringUtils.contains(t.getTimeFrame(), "m") ? GenericeConstants.ORDER_TYPE_MIS : GenericeConstants.ORDER_TYPE_CNC);
             ps.setString(15, t.getTimeFrame());
 
             if (tradeAnalysis != null) {
@@ -233,7 +233,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         String sql = "SELECT * FROM "+tableName+" WHERE TIMEFRAME = ?   AND orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
         List<TradeModel> tradeModels = new ArrayList<>();
         try (Connection c = conn(); ) {
-            String ordertType = StringUtils.contains(timeframe, "m") ? "MIS" : "CNC";
+            String ordertType = StringUtils.contains(timeframe, "m") ? GenericeConstants.ORDER_TYPE_MIS : GenericeConstants.ORDER_TYPE_CNC;
             PreparedStatement ps = c.prepareStatement(sql);
             ps.setString(1,timeframe);
             ps.setString(2,ordertType);
@@ -442,6 +442,16 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         return tradeModels;
     }
     // --- IMPLEMENTATION ---
+
+    public List<TradeModel> listForceClosedTradesForSymbol(String symbol,String tableName) throws SQLException {
+        String sql = "SELECT * FROM "+tableName+" WHERE Reason = 'Market closed -FORCE  MIS exit' AND symbol = '"+symbol+"'";
+        List<TradeModel> tradeModels = new ArrayList<>();
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) tradeModels.add(mapRow(rs));
+        }
+        return tradeModels;
+    }
 
     // WATCHLIST
     @Override

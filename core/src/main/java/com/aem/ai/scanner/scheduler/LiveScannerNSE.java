@@ -23,7 +23,9 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -68,6 +70,10 @@ public class LiveScannerNSE implements Runnable {
         String trades_table() default "stock_trades";
 
 
+        @AttributeDefinition(name = "Trades cut off time. hh:mm in 24hr format", description = "E.g. 15:20")
+        String trade_cutoff_time() default "14:00";
+
+
     }
 
     private volatile Config config;
@@ -95,6 +101,10 @@ public class LiveScannerNSE implements Runnable {
 
     @Reference
     private NSEMarketOpenStatusService nseMarketOpenStatusService;
+
+    private int cutOffHour = 14;
+    private int cutOffMinute = 0;
+
 
 
 
@@ -127,7 +137,19 @@ public class LiveScannerNSE implements Runnable {
     @Modified
     protected void activate(Config cfg) {
         this.config = cfg;
+        String tradeCutoffTime = cfg.trade_cutoff_time();
+        if (StringUtils.isNotEmpty(tradeCutoffTime) && tradeCutoffTime.contains(":")){
+            String[] parts = tradeCutoffTime.split(":");
+            try {
+                cutOffHour = Integer.parseInt(parts[0]);
+                cutOffMinute = Integer.parseInt(parts[1]);
+            }catch (Exception e){
+                log.error("Invalid trade cutoff time format, using default 14:00");
+                cutOffHour = 14;
+                cutOffMinute = 0;
+            }
 
+        }
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         log.info("✅ LiveScannerNSE activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
     }
@@ -292,11 +314,12 @@ public class LiveScannerNSE implements Runnable {
     }
 
 
+
     private void tradesMonitor(InstrumentSymbol symbol, List<Candle> candles) {
         try {
             double ltp = candles.get(candles.size() - 1).getClose();
             List<TradeModel> openTrades = daoFactory.listOpenTradesForSymbol(symbol.getSymbol(), config.trades_table());
-
+            updateLtpPnlForceClosedTrades(symbol, ltp);
             for (TradeModel t : openTrades) {
                 daoFactory.updateLtp(t, ltp, config.trades_table());
                 boolean hitTarget = (t.getSide() == Signal.Side.BUY && ltp >= t.getTarget())
@@ -308,7 +331,7 @@ public class LiveScannerNSE implements Runnable {
                 MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
                 boolean closed = marketStatus != null && StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), "CLOSED");
 
-                boolean misClose = closed && StringUtils.equalsIgnoreCase(t.getOrderType(), "MIS");
+                boolean misClose = closed && StringUtils.equalsIgnoreCase(t.getOrderType(), GenericeConstants.ORDER_TYPE_MIS);
                 if (hitTarget || hitStop || misClose) {
                     double exitPrice = t.getTarget();
                     if (hitStop){
@@ -333,6 +356,18 @@ public class LiveScannerNSE implements Runnable {
         } catch (Exception e) {
             log.error("Trade monitor failed: {}", e.getMessage(),e);
         }
+    }
+
+    private void updateLtpPnlForceClosedTrades(InstrumentSymbol symbol, double ltp) throws SQLException {
+        List<TradeModel> forceClosedTradesForSymbol = daoFactory.listForceClosedTradesForSymbol(symbol.getSymbol(), config.trades_table());
+        forceClosedTradesForSymbol.forEach(t -> {
+            try {
+                daoFactory.updateLtp(t, ltp, config.trades_table());
+                log.info("🔴 Force-closed trade {} at LTP={}", symbol.getSymbol(), ltp);
+            } catch (Exception e) {
+                log.error("Failed to force-close trade {}: {}", t.getTradeId(), e.getMessage(), e);
+            }
+        });
     }
 
     private List<StrategyConfig> parseStrategiesCached(InstrumentSymbol symbol) {
@@ -376,6 +411,8 @@ public class LiveScannerNSE implements Runnable {
                                Signal signal,
                                String signalMsg) throws Exception {
 
+
+
         List<TradeModel> openTrades = daoFactory.listOpenTrades(symbol, timeframe, signal, config.trades_table());
         if (!openTrades.isEmpty()) {
             daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
@@ -390,10 +427,12 @@ public class LiveScannerNSE implements Runnable {
         trade.setStatus(TradeModel.Status.OPEN);
         trade.setTimeFrame(timeframe);
 
+
         if (!trade.isValid()) {
             log.warn("Trade is invalid: {}", trade);
             return;
         }
+
         // Generate trade analysis
         PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
         if (pivots != null) {
@@ -401,18 +440,27 @@ public class LiveScannerNSE implements Runnable {
                     pivots.getPivot(), pivots.getR1(), pivots.getS1());
         }
         TradeAnalysis tradeAnalysis = geminiService.tradeSignalAnalysis(
-                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg,pivots)
+                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg, pivots)
         );
 
-        telegram.sendMessageDailyStocksAlerts(signalMsg);
-
+        // Check if MIS order and time is after 2 PM
+        if ("MIS".equalsIgnoreCase(trade.getOrderType())) {
+            LocalTime now = LocalTime.now();
+            LocalTime cutoff = LocalTime.of(cutOffHour, cutOffMinute); // 2:00 PM
+            if (now.isAfter(cutoff)) {
+                log.info("Skipping MIS trade for {} as current time {} is after cutoff {}", symbol.getSymbol(), now, cutoff);
+                return;
+            }
+        }
         // Insert trade into database
-        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table(),pivots);
+        telegram.sendMessageDailyStocksAlerts(signalMsg);
+        daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table(), pivots);
         daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
 
         // Log beautifully formatted signal
         log.debug("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, signalMsg));
     }
+
 
     /**
      * Format trade signal message for logs and analysis
