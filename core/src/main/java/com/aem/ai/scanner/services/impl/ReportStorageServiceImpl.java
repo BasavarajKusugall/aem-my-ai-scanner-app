@@ -57,32 +57,42 @@ public class ReportStorageServiceImpl implements ReportStorageService {
             String filePath = folderPath + "/" + fileName;
             Resource fileRes = resolver.getResource(filePath);
             if (fileRes == null) {
-                fileRes = ResourceUtil.getOrCreateResource(resolver, filePath,
-                        Collections.singletonMap("jcr:primaryType", "nt:file"), null, true);
+                Map<String, Object> fileProps = new HashMap<>();
+                fileProps.put("jcr:primaryType", "nt:file");
+                fileRes = resolver.create(folderRes, fileName, fileProps);
             }
 
-            // Ensure jcr:content exists under nt:file
-            String contentPath = filePath + "/jcr:content";
-            Resource contentRes = resolver.getResource(contentPath);
+            // Ensure jcr:content exists
+            Resource contentRes = resolver.getResource(filePath + "/jcr:content");
             if (contentRes == null) {
-                contentRes = ResourceUtil.getOrCreateResource(resolver, contentPath,
-                        Collections.singletonMap("jcr:primaryType", "nt:resource"), null, true);
+                Map<String, Object> contentProps = new HashMap<>();
+                contentProps.put("jcr:primaryType", "nt:resource");
+                contentRes = resolver.create(fileRes, "jcr:content", contentProps);
             }
 
-            // Set properties on jcr:content
-            ModifiableValueMap props = contentRes.adaptTo(ModifiableValueMap.class);
-            if (props != null) {
-                Session session = resolver.adaptTo(Session.class);
-                if (session != null) {
-                    Binary binary = session.getValueFactory()
-                            .createBinary(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
-                    props.put("jcr:data", binary);
-                } else {
-                    props.put("jcr:data", content.getBytes(StandardCharsets.UTF_8));
-                    LOG.warn("Storing plain bytes for {}", filePath);
+            // Use Node API for binary property
+            Session session = resolver.adaptTo(Session.class);
+            javax.jcr.Node contentNode = contentRes.adaptTo(javax.jcr.Node.class);
+
+            if (session != null && contentNode != null) {
+                try (ByteArrayInputStream bais =
+                             new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+                    Binary binary = session.getValueFactory().createBinary(bais);
+                    contentNode.setProperty("jcr:data", binary);
+                    contentNode.setProperty("jcr:lastModified", Calendar.getInstance());
+                    contentNode.setProperty("jcr:mimeType", mimeType != null ? mimeType : "text/plain");
+                    contentNode.setProperty("jcr:encoding", "UTF-8");
                 }
-                props.put("jcr:mimeType", mimeType);
-                props.put("jcr:lastModified", Calendar.getInstance());
+            } else {
+                // fallback (string store)
+                ModifiableValueMap props = contentRes.adaptTo(ModifiableValueMap.class);
+                if (props != null) {
+                    props.put("jcr:data", content);
+                    props.put("jcr:lastModified", Calendar.getInstance());
+                    props.put("jcr:mimeType", mimeType != null ? mimeType : "text/plain");
+                    props.put("jcr:encoding", "UTF-8");
+                    LOG.warn("Stored report as plain string (fallback) for {}", filePath);
+                }
             }
 
             resolver.commit();
@@ -93,6 +103,7 @@ public class ReportStorageServiceImpl implements ReportStorageService {
             throw e;
         }
     }
+
 
     @ObjectClassDefinition(
             name = "Report Storage Configuration",

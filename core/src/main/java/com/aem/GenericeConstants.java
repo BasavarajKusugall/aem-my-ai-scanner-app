@@ -10,4 +10,6 @@ public class GenericeConstants {
     public static final String CRYPTO = "CRYPTO";
     public static final String ORDER_TYPE_MIS = "MIS";
     public static final String ORDER_TYPE_CNC = "CNC";
+    public static final String STOCK_TRADES_TABLE = "stock_trades";
+    public static final String CURRENCY_TRADES_TABLE = "currency_trades";
 }

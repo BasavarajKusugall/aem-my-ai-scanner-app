@@ -1,6 +1,5 @@
 package com.aem.ai.scanner.factory.impl;
 
-
 import com.aem.ai.scanner.factory.IndicatorFactoryService;
 import com.aem.ai.scanner.factory.RuleFactoryService;
 import com.aem.ai.scanner.model.Condition;
@@ -30,32 +29,46 @@ public class RuleFactoryImpl implements RuleFactoryService {
         String op = cond.operator.toLowerCase();
         switch (op) {
             case "<": {
+                // RSI < threshold type rules
                 Num thr = series.numOf(((Number) cond.value).doubleValue());
                 return new UnderIndicatorRule(ind, thr);
             }
             case ">": {
+                // RSI > threshold type rules
                 Num thr = series.numOf(((Number) cond.value).doubleValue());
                 return new OverIndicatorRule(ind, thr);
             }
             case "cross_up": {
-                if ("signal_line".equals(cond.value)) {
+                // MACD cross up with signal line
+                if ("signal_line".equalsIgnoreCase(String.valueOf(cond.value))) {
                     MACDIndicator macd = new MACDIndicator(new ClosePriceIndicator(series), cond.fast, cond.slow);
                     EMAIndicator sig = new EMAIndicator(macd, cond.signal);
                     return new CrossedUpIndicatorRule(macd, sig);
-                } else {
-                    var other = new ClosePriceIndicator(series);
-                    return new CrossedUpIndicatorRule(ind, other);
                 }
+                // EMA fast cross up EMA slow
+                if ("EMA".equalsIgnoreCase(cond.indicator) && cond.fast != null && cond.slow != null) {
+                    EMAIndicator fastEma = new EMAIndicator(new ClosePriceIndicator(series), cond.fast);
+                    EMAIndicator slowEma = new EMAIndicator(new ClosePriceIndicator(series), cond.slow);
+                    return new CrossedUpIndicatorRule(fastEma, slowEma);
+                }
+                // fallback: indicator crosses close price
+                return new CrossedUpIndicatorRule(ind, new ClosePriceIndicator(series));
             }
             case "cross_down": {
-                if ("signal_line".equals(cond.value)) {
+                // MACD cross down with signal line
+                if ("signal_line".equalsIgnoreCase(String.valueOf(cond.value))) {
                     MACDIndicator macd = new MACDIndicator(new ClosePriceIndicator(series), cond.fast, cond.slow);
                     EMAIndicator sig = new EMAIndicator(macd, cond.signal);
                     return new CrossedDownIndicatorRule(macd, sig);
-                } else {
-                    var other = new ClosePriceIndicator(series);
-                    return new CrossedDownIndicatorRule(ind, other);
                 }
+                // EMA fast cross down EMA slow
+                if ("EMA".equalsIgnoreCase(cond.indicator) && cond.fast != null && cond.slow != null) {
+                    EMAIndicator fastEma = new EMAIndicator(new ClosePriceIndicator(series), cond.fast);
+                    EMAIndicator slowEma = new EMAIndicator(new ClosePriceIndicator(series), cond.slow);
+                    return new CrossedDownIndicatorRule(fastEma, slowEma);
+                }
+                // fallback: indicator crosses close price
+                return new CrossedDownIndicatorRule(ind, new ClosePriceIndicator(series));
             }
             default:
                 throw new IllegalArgumentException("Unknown operator: " + cond.operator);

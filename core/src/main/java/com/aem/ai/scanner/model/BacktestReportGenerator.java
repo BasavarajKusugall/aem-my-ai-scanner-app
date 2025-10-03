@@ -1,10 +1,13 @@
 package com.aem.ai.scanner.model;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.reports.ReportGenerator;
+import org.ta4j.core.reports.TradingStatement;
 
 import java.io.StringWriter;
 import java.util.List;
@@ -12,14 +15,18 @@ import java.util.List;
 /**
  * Custom report generator for backtest results.
  */
-import org.ta4j.core.reports.TradingStatement;
-
 public class BacktestReportGenerator implements ReportGenerator<String> {
 
     private final List<TradingStatement> tradingStatements;
+    private final ObjectMapper mapper;
 
     public BacktestReportGenerator(List<TradingStatement> tradingStatements) {
         this.tradingStatements = tradingStatements;
+
+        // configure mapper once
+        this.mapper = new ObjectMapper();
+        this.mapper.registerModule(new JavaTimeModule()); // handle Duration, LocalDateTime, etc.
+        this.mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // readable ISO-8601
     }
 
     @Override
@@ -43,7 +50,6 @@ public class BacktestReportGenerator implements ReportGenerator<String> {
 
     public String generateJson() {
         try {
-            ObjectMapper mapper = new ObjectMapper();
             return mapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(tradingStatements);
         } catch (Exception e) {
@@ -70,4 +76,3 @@ public class BacktestReportGenerator implements ReportGenerator<String> {
         return sb.toString();
     }
 }
-

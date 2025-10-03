@@ -87,7 +87,7 @@ public class LiveScannerDeltaExchange implements Runnable {
     @Reference
     private GeminiService geminiService;
 
-
+    public  String cryptoTradeTable;
 
 
     private final Map<String, MarketDataService> servicesByBroker = new ConcurrentHashMap<>();
@@ -118,6 +118,7 @@ public class LiveScannerDeltaExchange implements Runnable {
     protected void activate(Config cfg) {
         this.config = cfg;
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        cryptoTradeTable = cfg.trades_table();
         log.info("✅ LiveScannerDeltaExchange activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
     }
 
@@ -141,6 +142,14 @@ public class LiveScannerDeltaExchange implements Runnable {
             consecutiveFailures.computeIfAbsent(SCHEDULER_KEY, k -> new AtomicInteger()).incrementAndGet();
             // do NOT rethrow
         }
+    }
+
+    public String getCryptoTradeTable() {
+        return cryptoTradeTable;
+    }
+
+    public void setCryptoTradeTable(String cryptoTradeTable) {
+        this.cryptoTradeTable = cryptoTradeTable;
     }
 
     private void doRun() {
@@ -202,7 +211,7 @@ public class LiveScannerDeltaExchange implements Runnable {
             // ✅ Collect signals for all strategies
             List<SignalResult> results = new ArrayList<>();
             for (StrategyConfig sc : strategies) {
-                PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+                PivotLevels pivots = LiveScannerDeltaExchange.getPivotLevels(symbol.getSymbol());
                 Optional<Signal> opt = strategyEngine.evaluate(sc, candles, symbol, timeframe, pivots);
                 opt.ifPresent(signal -> results.add(new SignalResult(sc, signal)));
             }
@@ -303,7 +312,6 @@ public class LiveScannerDeltaExchange implements Runnable {
 
     private void handleSignal(InstrumentSymbol symbol, String timeframe, StrategyConfig sc, Signal signal) throws Exception {
         String msg = strategyEngine.format(signal, sc, symbol, timeframe);
-        telegram.sendMessageDailyCryptoAlerts(msg);
 
         if (signal.getSide() == Signal.Side.BUY) {
             onEntrySignal(symbol, timeframe, sc, signal, msg);
@@ -316,18 +324,18 @@ public class LiveScannerDeltaExchange implements Runnable {
                                String timeframe,
                                StrategyConfig sc,
                                Signal signal,
-                               String comment) throws Exception {
+                               String msg) throws Exception {
 
         List<TradeModel> openTrades = daoFactory.listOpenTrades(symbol, timeframe, signal, config.trades_table());
         if (!openTrades.isEmpty()) {
-            daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
-            log.info("🔔 Comment appended to existing open trade: {} - {}", symbol.getSymbol(), comment);
+            //daoFactory.appendOpenTradeComment(symbol, signal.getSide(), msg, config.trades_table());
+            log.info("🔔 Comment appended to existing open trade: {} - {}", symbol.getSymbol(), msg);
             return;
         }
 
-        PivotLevels pivots = LiveScannerNSE.getPivotLevels(symbol.getSymbol());
+        PivotLevels pivots = LiveScannerDeltaExchange.getPivotLevels(symbol.getSymbol());
         if (pivots != null) {
-            comment += String.format("\nPivots: P=%.2f R1=%.2f S1=%.2f",
+            msg += String.format("\nPivots: P=%.2f R1=%.2f S1=%.2f",
                     pivots.getPivot(), pivots.getR1(), pivots.getS1());
         }
         // Create new trade model
@@ -339,20 +347,20 @@ public class LiveScannerDeltaExchange implements Runnable {
 
         // Generate trade analysis
         TradeAnalysis tradeAnalysis = geminiService.tradeSignalAnalysis(
-                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment)
+                Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, msg)
         );
 
         if (!trade.isValid()) {
             log.warn("Trade is invalid: {}", trade);
             return;
         }
-
+        telegram.sendMessageDailyCryptoAlerts(msg);
         // Insert trade into database
         daoFactory.insertTrade(trade, tradeAnalysis, config.trades_table(), pivots);
-        daoFactory.appendOpenTradeComment(symbol, signal.getSide(), comment, config.trades_table());
+        daoFactory.appendOpenTradeComment(symbol, signal.getSide(), msg, config.trades_table());
 
         // Log beautifully formatted signal
-        log.debug("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, comment));
+        log.debug("\n{}", Utils.formatTradeSignalMessage(symbol, timeframe, sc, signal, msg));
     }
 
     /**
@@ -384,5 +392,8 @@ public class LiveScannerDeltaExchange implements Runnable {
             this.hash = hash;
             this.strategies = strategies;
         }
+    }
+    public static PivotLevels getPivotLevels(String symbol) {
+        return DAILY_PIVOT_LEVELS.get(symbol);
     }
 }

@@ -30,6 +30,7 @@ public class TradeModel {
     private double pnl;
     private double ltp;
     private double pnlPercentage;
+    private PivotLevels pivotLevels;
 
     public void setLtp(double ltp) {
         this.ltp = ltp;
@@ -45,6 +46,14 @@ public class TradeModel {
 
     public double getPnlPercentage() {
         return safeDouble(pnlPercentage);
+    }
+
+    public void setPivotLevels(PivotLevels pivotLevels) {
+        this.pivotLevels = pivotLevels;
+    }
+
+    public PivotLevels getPivotLevels() {
+        return pivotLevels;
     }
 
     public enum Status {

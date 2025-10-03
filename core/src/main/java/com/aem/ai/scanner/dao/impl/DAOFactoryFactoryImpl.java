@@ -230,15 +230,14 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
 
     // -------------------- LIST OPEN TRADES --------------------
     public List<TradeModel> listOpenTrades(InstrumentSymbol symbol, String timeframe, Signal signal, String tableName) throws SQLException {
-        String sql = "SELECT * FROM "+tableName+" WHERE TIMEFRAME = ?   AND orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
+        String sql = "SELECT * FROM "+tableName+" WHERE orderType = 'MIS'   AND orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
         List<TradeModel> tradeModels = new ArrayList<>();
         try (Connection c = conn(); ) {
             String ordertType = StringUtils.contains(timeframe, "m") ? GenericeConstants.ORDER_TYPE_MIS : GenericeConstants.ORDER_TYPE_CNC;
             PreparedStatement ps = c.prepareStatement(sql);
-            ps.setString(1,timeframe);
-            ps.setString(2,ordertType);
-            ps.setString(3,symbol.getSymbol());
-            ps.setString(4,signal.getSide().name());
+            ps.setString(1,ordertType);
+            ps.setString(2,symbol.getSymbol());
+            ps.setString(3,signal.getSide().name());
             ResultSet rs = ps.executeQuery();
             while (rs.next()) tradeModels.add(mapRow(rs));
         }
@@ -329,6 +328,16 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         tradeModel.setTimeFrame(rs.getString("TIMEFRAME"));
         tradeModel.setStatus(TradeModel.Status.valueOf(rs.getString("status")));
         tradeModel.setOrderType(rs.getString("orderType"));
+
+        double r1 = rs.getDouble("R1");
+        double r2 = rs.getDouble("R2");
+        double r3 = rs.getDouble("R3");
+        double pivot = rs.getDouble("pivot");
+        double s1 = rs.getDouble("S1");
+        double s2 = rs.getDouble("S2");
+        double s3 = rs.getDouble("S3");
+        PivotLevels pivotLevels = new PivotLevels(pivot,r1, r2, r3, s1, s2, s3);
+        tradeModel.setPivotLevels(pivotLevels);
         // try to set LTP/pnl_percentage if present
         try {
             double ltp = rs.getDouble("ltp");
@@ -648,7 +657,20 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         }
     }
 
-
+    @Override
+    public List<TradeModel> listAllOpenTrades(String tableName) {
+        String sql = "SELECT * FROM "+tableName+" WHERE status = 'OPEN'; ";
+        List<TradeModel> tradeModels = new ArrayList<>();
+        try (Connection c = conn(); ) {
+            PreparedStatement ps = Objects.requireNonNull(c).prepareStatement(sql);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) tradeModels.add(mapRow(rs));
+        } catch (SQLException e) {
+            logger.error("Error listing all open trades from {}", tableName, e);
+            throw new RuntimeException(e);
+        }
+        return tradeModels;
+    }
 
 
 }

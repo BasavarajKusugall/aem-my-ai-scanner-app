@@ -92,6 +92,8 @@ public class UpstoxService extends BaseService {
         }
 
         String finalUrl = url;
+        log.info("Fetching {} candles for {} {} from Upstox: {}",
+                count, symbolOrKey, timeframe, finalUrl);
         String body = withRetry(cfg.retries(), cfg.backoff_ms(), () -> {
             try {
                 Map<String,String> headers = new HashMap<>();

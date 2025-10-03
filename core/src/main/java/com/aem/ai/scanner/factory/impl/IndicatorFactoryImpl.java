@@ -22,6 +22,8 @@ public class IndicatorFactoryImpl implements IndicatorFactoryService {
     @Override
     public CachedIndicator<Num> buildIndicator(Condition cond, BarSeries series) {
         String name = cond.indicator.toUpperCase();
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
         switch (name) {
             case "RSI": {
                 int rsiPeriod = cond.period == null ? 14 : cond.period;
@@ -38,8 +40,16 @@ public class IndicatorFactoryImpl implements IndicatorFactoryService {
                 return macd;
             }
             case "EMA": {
-                int emaP = cond.period == null ? 21 : cond.period;
-                return new EMAIndicator(new ClosePriceIndicator(series), emaP);
+                // If fast + slow provided, RuleFactory will build cross rules
+                // Here we return the *fast EMA* as the base indicator
+                if (cond.fast != null) {
+                    return new EMAIndicator(close, cond.fast);
+                }
+                if (cond.period != null) {
+                    return new EMAIndicator(close, cond.period);
+                }
+                throw new IllegalArgumentException("EMA requires fast or period field");
+
             }
             case "EMA_CROSS": {
                 int fastEma = cond.fast == null ? 9 : cond.fast;

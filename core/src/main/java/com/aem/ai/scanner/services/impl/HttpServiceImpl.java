@@ -70,7 +70,7 @@ public class HttpServiceImpl implements HttpService {
         return RetryUtils.executeWithExponentialBackoff(() -> {
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-                log.info("HTTP GET successful for {}", url);
+                log.debug("HTTP GET successful for {}", url);
                 return resp.body();
             } else {
                 log.error("HTTP GET failed: status={} body={}", resp.statusCode(), resp.body());

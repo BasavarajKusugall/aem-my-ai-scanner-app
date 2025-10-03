@@ -127,11 +127,11 @@ public class TelegramServiceImpl implements TelegramService {
                 String url = apiUrl + "?chat_id=" + URLEncoder.encode(String.valueOf(cfg.getBotChatId()), StandardCharsets.UTF_8)
                         + "&text=" + URLEncoder.encode(finalChunk, StandardCharsets.UTF_8);
 
-                log.info("Sending to {} ({}) [Chunk {}/{}]",
+                log.debug("Sending to {} ({}) [Chunk {}/{}]",
                         cfg.getChatTitle(), cfg.getPurpose(), (i + 1), totalChunks);
 
                 String res = http.get(url);
-                log.info("Sent chunk {}/{} to {} ({}) response={}",
+                log.debug("Sent chunk {}/{} to {} ({}) response={}",
                         (i + 1), totalChunks, cfg.getChatTitle(), cfg.getPurpose(), res);
 
                 // Add delay if more chunks are left

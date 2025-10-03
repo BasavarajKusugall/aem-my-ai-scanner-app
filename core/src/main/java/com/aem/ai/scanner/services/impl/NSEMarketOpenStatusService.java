@@ -1,6 +1,7 @@
 package com.aem.ai.scanner.services.impl;
 
 import com.aem.ai.scanner.model.MarketStatusResult;
+import com.aem.ai.scanner.scheduler.LiveScannerNSE;
 import com.aem.ai.scanner.services.HttpService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +9,8 @@ import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,6 +24,8 @@ import java.time.format.DateTimeFormatter;
 )
 @Designate(ocd = NSEMarketOpenStatusService.Config.class)
 public class NSEMarketOpenStatusService {
+    private static final Logger LOG = LoggerFactory.getLogger(NSEMarketOpenStatusService.class);
+
 
     @Reference
     private HttpService httpService;
@@ -36,6 +41,8 @@ public class NSEMarketOpenStatusService {
     }
 
     public MarketStatusResult getMarketStatus() throws Exception {
+        MarketStatusResult result = new MarketStatusResult();
+
         // 1. Prepare today’s date in yyyy-MM-dd format
         String today = LocalDate.now(ZoneId.of("Asia/Kolkata"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
@@ -48,8 +55,13 @@ public class NSEMarketOpenStatusService {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(response);
 
-        JsonNode dataArray = root.path("data");
+        JsonNode dataArray = root.has("data") ? root.path("data") : null;
         JsonNode nseNode = null;
+        if (dataArray == null || !dataArray.isArray()) {
+            LOG.info("No market timings data found in response");
+            result.setMarketStatus("CLOSED");
+            return result;
+        }
 
         for (JsonNode node : dataArray) {
             if ("NSE".equalsIgnoreCase(node.path("exchange").asText())) {
@@ -83,7 +95,6 @@ public class NSEMarketOpenStatusService {
                 : "CLOSED";
 
         // 4. Return structured result
-        MarketStatusResult result = new MarketStatusResult();
         result.setExchange("NSE");
         result.setMarketStatus(status);
         result.setCurrentTime(now.toString());

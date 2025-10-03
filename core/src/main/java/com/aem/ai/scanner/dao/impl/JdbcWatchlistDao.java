@@ -90,13 +90,31 @@ public class JdbcWatchlistDao implements WatchlistDao {
             while (rs.next()) {
                 String instrumentKey =  StringUtils.EMPTY;
                 String symbol = rs.getString("SYMBOL");
-                if (StringUtils.equals(type,"UPSTOX")){
-                    instrumentKey = rs.getString("INSTRUMENT_KEY");
-                }
+
                 String bestStrategy = rs.getString("BEST_STRATEGY");
+
 
                 // NSE_EQ constant assumed available from GenericeConstants
                 InstrumentSymbol inst = new InstrumentSymbol(symbol, bestStrategy, GenericeConstants.NSE_EQ + instrumentKey);
+                if (StringUtils.equals(type,"UPSTOX")){
+                    instrumentKey = rs.getString("INSTRUMENT_KEY");
+                    if (StringUtils.isNotEmpty(instrumentKey)){
+                        inst.setInstrumentKey(GenericeConstants.NSE_EQ + instrumentKey);
+                    }
+                    String eventType = rs.getString("EVENT_TYPE");
+                    String confindence_score = rs.getString("confindence_score");
+                    String market_bias = rs.getString("market_bias");
+                    if (StringUtils.isNotEmpty(eventType)){
+                        inst.setEventType(eventType);
+                    }
+                    if (StringUtils.isNotEmpty(confindence_score)){
+                        inst.setConfidenceScore(confindence_score);
+                    }
+                    if (StringUtils.isNotEmpty(market_bias)){
+                        inst.setMarketBias(market_bias);
+                    }
+                }
+
                 watchlist.add(inst);
             }
             log.info("Loaded {} symbols from {}", watchlist.size(), table);

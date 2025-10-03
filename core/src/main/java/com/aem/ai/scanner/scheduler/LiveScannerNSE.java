@@ -29,7 +29,9 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
+//todo : Check Pivot levels before the entry.
+// Implement trailing SL and Target
+// Similarly check the target with pivot levels.
 @Designate(ocd = LiveScannerNSE.Config.class)
 @Component(
         service = Runnable.class,
@@ -75,6 +77,8 @@ public class LiveScannerNSE implements Runnable {
 
 
     }
+
+    public  String stocksTradeTable;
 
     private volatile Config config;
 
@@ -131,6 +135,14 @@ public class LiveScannerNSE implements Runnable {
         }
     }
 
+    public String getStocksTradeTable() {
+        return stocksTradeTable;
+    }
+
+    public void setStocksTradeTable(String stocksTradeTable) {
+        this.stocksTradeTable = stocksTradeTable;
+    }
+
     private final Map<String, AtomicInteger> consecutiveFailures = new ConcurrentHashMap<>();
 
     @Activate
@@ -151,6 +163,7 @@ public class LiveScannerNSE implements Runnable {
 
         }
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        stocksTradeTable = cfg.trades_table();
         log.info("✅ LiveScannerNSE activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
     }
 
@@ -203,6 +216,11 @@ public class LiveScannerNSE implements Runnable {
         MarketDataService svc = servicesByBroker.get(GenericeConstants.UPSTOX);
         if (svc == null) {
             log.warn("No MarketDataService for broker {}", GenericeConstants.UPSTOX);
+            return;
+        }
+        MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
+        if (marketStatus == null || !StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), "OPEN")) {
+            log.warn("Market is not open (status={})", marketStatus != null ? marketStatus.getMarketStatus() : "null");
             return;
         }
 
@@ -319,7 +337,7 @@ public class LiveScannerNSE implements Runnable {
         try {
             double ltp = candles.get(candles.size() - 1).getClose();
             List<TradeModel> openTrades = daoFactory.listOpenTradesForSymbol(symbol.getSymbol(), config.trades_table());
-            updateLtpPnlForceClosedTrades(symbol, ltp);
+            //updateLtpPnlForceClosedTrades(symbol, ltp); todo : Implement trade Monitor scheduler
             for (TradeModel t : openTrades) {
                 daoFactory.updateLtp(t, ltp, config.trades_table());
                 boolean hitTarget = (t.getSide() == Signal.Side.BUY && ltp >= t.getTarget())
@@ -359,6 +377,7 @@ public class LiveScannerNSE implements Runnable {
     }
 
     private void updateLtpPnlForceClosedTrades(InstrumentSymbol symbol, double ltp) throws SQLException {
+        //todo: Stop update LTP for force-closed trades after 3.30pm o the exit day
         List<TradeModel> forceClosedTradesForSymbol = daoFactory.listForceClosedTradesForSymbol(symbol.getSymbol(), config.trades_table());
         forceClosedTradesForSymbol.forEach(t -> {
             try {
@@ -415,7 +434,7 @@ public class LiveScannerNSE implements Runnable {
 
         List<TradeModel> openTrades = daoFactory.listOpenTrades(symbol, timeframe, signal, config.trades_table());
         if (!openTrades.isEmpty()) {
-            daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
+            //daoFactory.appendOpenTradeComment(symbol, signal.getSide(), signalMsg, config.trades_table());
             log.info("🔔 Comment appended to existing open trade: {} - {}", symbol.getSymbol(), signalMsg);
             return;
         }

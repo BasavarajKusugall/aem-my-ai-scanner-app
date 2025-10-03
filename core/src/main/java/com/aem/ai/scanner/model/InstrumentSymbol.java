@@ -17,6 +17,10 @@ public class InstrumentSymbol {
     @ValueMapValue
     private String bestStrategy;
 
+    private String eventType;
+    private String confidenceScore;
+    private String marketBias;
+
     @ValueMapValue(name = "instrument_key")
     private String instrumentKey;
 
@@ -34,7 +38,6 @@ public class InstrumentSymbol {
         this.bestStrategy = bestStrategy;
         this.instrumentKey = instrumentKey;
     }
-
     public String getSymbol() {
         return symbol;
     }
@@ -59,10 +62,37 @@ public class InstrumentSymbol {
         this.instrumentKey = instrumentKey;
     }
 
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
+
+    public String getConfidenceScore() {
+        return confidenceScore;
+    }
+
+    public void setConfidenceScore(String confidenceScore) {
+        this.confidenceScore = confidenceScore;
+    }
+
+    public String getMarketBias() {
+        return marketBias;
+    }
+
+    public void setMarketBias(String marketBias) {
+        this.marketBias = marketBias;
+    }
+
     @Override
     public String toString() {
         return "InstrumentSymbol{" +
                 "symbol='" + symbol + '\'' +
+                ", eventType='" + eventType + '\'' +
+                ", confidenceScore='" + confidenceScore + '\'' +
+                ", marketBias='" + marketBias + '\'' +
                 ", instrumentKey='" + instrumentKey + '\'' +
                 '}';
     }
