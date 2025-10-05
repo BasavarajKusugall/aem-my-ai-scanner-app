@@ -20,6 +20,7 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component(service = BrokerConnector.class, immediate = true)
 public class UpstoxConnector implements BrokerConnector {
@@ -87,6 +88,11 @@ public class UpstoxConnector implements BrokerConnector {
             log.error(RED + "❌ Unexpected error in Upstox fetch: {}" + RESET, e.getMessage(), e);
             throw new BrokerException("Upstox fetch failed: " + e.getMessage(), -1, e);
         }
+    }
+
+    @Override
+    public CashSummary getFundsForAccount(Map<String, String> headers) throws Exception {
+        return null;
     }
 
     private static <T> T unchecked(CallableEx<T> c){ try { return c.call(); } catch(Exception e){ throw new RuntimeException(e); } }

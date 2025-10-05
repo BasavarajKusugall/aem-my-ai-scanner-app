@@ -2,7 +2,6 @@ package com.aem.ai.scanner.model;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TradingRecord;
@@ -25,7 +24,7 @@ public class BacktestReportGenerator implements ReportGenerator<String> {
 
         // configure mapper once
         this.mapper = new ObjectMapper();
-        this.mapper.registerModule(new JavaTimeModule()); // handle Duration, LocalDateTime, etc.
+        this.mapper.findAndRegisterModules();
         this.mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // readable ISO-8601
     }
 

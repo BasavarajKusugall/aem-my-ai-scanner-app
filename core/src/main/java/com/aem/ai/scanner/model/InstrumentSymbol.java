@@ -21,6 +21,8 @@ public class InstrumentSymbol {
     private String confidenceScore;
     private String marketBias;
 
+    public int allowedMarginFundsPercent;
+
     @ValueMapValue(name = "instrument_key")
     private String instrumentKey;
 
@@ -84,6 +86,14 @@ public class InstrumentSymbol {
 
     public void setMarketBias(String marketBias) {
         this.marketBias = marketBias;
+    }
+
+    public int getAllowedMarginFundsPercent() {
+        return allowedMarginFundsPercent;
+    }
+
+    public void setAllowedMarginFundsPercent(int allowedMarginFundsPercent) {
+        this.allowedMarginFundsPercent = allowedMarginFundsPercent;
     }
 
     @Override

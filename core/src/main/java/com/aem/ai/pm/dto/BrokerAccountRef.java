@@ -12,9 +12,18 @@ public class BrokerAccountRef {
     public  String apiKey;       // decrypted short-lived access
     public  String apiSecrete;       // decrypted short-lived access
     public  String brokerAccountRef;       // decrypted short-lived access
+    public  int approvedFundsPercentage;       // decrypted short-lived access
     public BrokerAccountRef(long userId, long ubaId, String brokerCode, String externalAccountId, String accessToken,String requestToken) {
         this.userId = userId; this.userBrokerAccountId = ubaId; this.requestToken= requestToken;
         this.brokerCode = brokerCode; this.externalAccountId = externalAccountId; this.accessToken = accessToken;
+    }
+
+    public int getApprovedFundsPercentage() {
+        return approvedFundsPercentage;
+    }
+
+    public void setApprovedFundsPercentage(int approvedFundsPercentage) {
+        this.approvedFundsPercentage = approvedFundsPercentage;
     }
 
     public long getUserId() {

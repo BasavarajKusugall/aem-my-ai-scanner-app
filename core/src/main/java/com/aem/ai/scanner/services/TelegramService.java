@@ -24,4 +24,6 @@ public interface TelegramService {
 
     void sendMessageToUser(String telegramBotUserId, String message);
     void sendMessageOHLAlerts( String message);
+    void sendMessageKiteAlerts( String message);
+
 }

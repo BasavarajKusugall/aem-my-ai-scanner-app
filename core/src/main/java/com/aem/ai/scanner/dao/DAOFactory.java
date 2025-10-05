@@ -57,4 +57,6 @@ public interface DAOFactory {
                               String eventType, String confidenceScore, String marketBias) throws Exception;
     List<TradeModel> listAllOpenTrades(String tableName);
     List<TradeModel> listForceClosedTradesForSymbol(String symbol,String tableName) throws SQLException;
+
+    List<TelegramConfig> fetchTelegramKiteAlertsConfigs();
 }

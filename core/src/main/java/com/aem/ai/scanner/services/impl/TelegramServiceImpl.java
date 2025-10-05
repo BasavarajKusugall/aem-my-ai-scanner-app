@@ -87,6 +87,16 @@ public class TelegramServiceImpl implements TelegramService {
         }
     }
 
+    @Override
+    public void sendMessageKiteAlerts(String message) {
+        List<TelegramConfig> configs = DAOFactory.fetchTelegramKiteAlertsConfigs();
+        for (TelegramConfig cfg : configs) {
+            if (null != cfg) {
+                sendToConfig(cfg, message);
+            }
+        }
+    }
+
     private void sendToConfig(TelegramConfig cfg, String text) {
         try {
             // Step 1: Split into chunks first

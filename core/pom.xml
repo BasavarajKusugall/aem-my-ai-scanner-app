@@ -44,7 +44,7 @@
         updated or not working at all).
     </description>
     <properties>
-        <jackson.version>2.15.2</jackson.version> <!-- or latest stable -->
+        <jackson.version>2.15.3</jackson.version> <!-- or latest stable -->
     </properties>
     <build>
         <plugins>
@@ -194,12 +194,6 @@
             <artifactId>jackson-core</artifactId>
             <version>${jackson.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-            <scope>provided</scope>
-        </dependency>
         <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -260,13 +254,6 @@
             <groupId>org.apache.sling</groupId>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-
-
 
     </dependencies>
 

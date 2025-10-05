@@ -7,6 +7,7 @@ import com.aem.ai.pm.net.HttpClientService;
 import com.aem.ai.pm.services.AccountRegistryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jetbrains.annotations.NotNull;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Modified;
@@ -85,10 +86,7 @@ public class DhanConnector implements BrokerConnector {
             List<PositionItem> positions = mapDhanPositions(positionsJson);
             log.info(GREEN + "✅ Positions fetched: {} items" + RESET, positions.size());
 
-            // 3) Funds
-            String fundsJson = http.get(cfg.baseUrl() + fundsEndpoint, headers, cfg.timeoutMs());
-            CashSummary cash = mapDhanFunds(fundsJson);
-            log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
+            CashSummary cash = getCashSummary(fundsEndpoint, headers);
 
             PortfolioSnapshot snapshot = new PortfolioSnapshot(holdings, positions, cash, Instant.now());
             snapshot.setHoldingsJson(holdingsJson);
@@ -102,6 +100,19 @@ public class DhanConnector implements BrokerConnector {
             log.error(RED + "❌ Error fetching Dhan portfolio: {}" + RESET, e.getMessage(), e);
             throw new BrokerException("Dhan fetch failed: " + e.getMessage(), -1, e);
         }
+    }
+
+    private @NotNull CashSummary getCashSummary(String fundsEndpoint, Map<String, String> headers) throws Exception {
+        // 3) Funds
+        String fundsJson = http.get(cfg.baseUrl() + fundsEndpoint, headers, cfg.timeoutMs());
+        CashSummary cash = mapDhanFunds(fundsJson);
+        log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
+        return cash;
+    }
+
+    @Override
+    public CashSummary getFundsForAccount(Map<String, String> headers) throws Exception {
+        return null;
     }
 
     // ---------- Mapping helpers ----------

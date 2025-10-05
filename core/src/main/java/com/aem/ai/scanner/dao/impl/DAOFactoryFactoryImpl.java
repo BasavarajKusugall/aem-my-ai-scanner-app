@@ -230,7 +230,8 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
 
     // -------------------- LIST OPEN TRADES --------------------
     public List<TradeModel> listOpenTrades(InstrumentSymbol symbol, String timeframe, Signal signal, String tableName) throws SQLException {
-        String sql = "SELECT * FROM "+tableName+" WHERE orderType = 'MIS'   AND orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
+        String sql = "SELECT * FROM "+tableName+" WHERE  orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
+        logger.info("Listing open trades with SQL: {}", sql);
         List<TradeModel> tradeModels = new ArrayList<>();
         try (Connection c = conn(); ) {
             String ordertType = StringUtils.contains(timeframe, "m") ? GenericeConstants.ORDER_TYPE_MIS : GenericeConstants.ORDER_TYPE_CNC;
@@ -272,6 +273,11 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     }
     public List<TelegramConfig> fetchTelegramDailyOHLAlertsConfigs() {
         String cond = " AND purpose='OHL'";
+        return fetchTelegramConfigs(cond);
+    }
+    @Override
+    public List<TelegramConfig> fetchTelegramKiteAlertsConfigs() {
+        String cond = " AND purpose='KITE'";
         return fetchTelegramConfigs(cond);
     }
 
@@ -461,6 +467,8 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         }
         return tradeModels;
     }
+
+
 
     // WATCHLIST
     @Override

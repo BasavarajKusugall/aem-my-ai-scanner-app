@@ -4,6 +4,7 @@ import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.scanner.dao.WatchlistDao;
 import com.aem.ai.scanner.model.InstrumentSymbol;
+import com.aem.ai.scanner.utils.Utils;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -94,8 +95,14 @@ public class JdbcWatchlistDao implements WatchlistDao {
                 String bestStrategy = rs.getString("BEST_STRATEGY");
 
 
+
                 // NSE_EQ constant assumed available from GenericeConstants
                 InstrumentSymbol inst = new InstrumentSymbol(symbol, bestStrategy, GenericeConstants.NSE_EQ + instrumentKey);
+                if (Utils.hasColumn(rs, "allowed_margin_funds")){
+                    int allowed_margin_funds = rs.getInt("allowed_margin_funds");
+                    log.debug("Setting allowed_margin_funds={} for symbol={}", allowed_margin_funds, symbol);
+                    inst.setAllowedMarginFundsPercent(allowed_margin_funds);
+                }
                 if (StringUtils.equals(type,"UPSTOX")){
                     instrumentKey = rs.getString("INSTRUMENT_KEY");
                     if (StringUtils.isNotEmpty(instrumentKey)){
@@ -113,6 +120,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
                     if (StringUtils.isNotEmpty(market_bias)){
                         inst.setMarketBias(market_bias);
                     }
+
                 }
 
                 watchlist.add(inst);

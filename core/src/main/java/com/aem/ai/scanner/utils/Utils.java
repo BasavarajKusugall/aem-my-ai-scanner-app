@@ -1,17 +1,27 @@
 package com.aem.ai.scanner.utils;
 
+import com.aem.ai.realtime.brokers.kite.OrderRequest;
 import com.aem.ai.scanner.model.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.time.*;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.aem.ai.scanner.model.TradeModel.IST_ZONE;
 
 public class Utils {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     /** Map timeframe string to Duration */
     public static Duration mapTimeframe(String tf) {
@@ -146,4 +156,38 @@ public class Utils {
 
         return new PivotLevels(pivot, r1, r2, r3, s1, s2, s3);
     }
+    public static boolean hasColumn(ResultSet rs, String columnName) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+        for (int i = 1; i <= columnCount; i++) {
+            if (columnName.equalsIgnoreCase(metaData.getColumnLabel(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+    public static String buildMarginRequestJson(OrderRequest order) throws JsonProcessingException {
+        Map<String, Object> jsonMap = new LinkedHashMap<>();
+
+        // required fields
+        jsonMap.put("exchange", order.getExchange());
+        jsonMap.put("tradingsymbol", order.getTradingsymbol());
+        jsonMap.put("transaction_type", order.getTransaction_type());
+
+        // Zerodha requires "variety", default it if not in extra
+        String variety = (order.getExtra() != null && order.getExtra().containsKey("variety"))
+                ? order.getExtra().get("variety")
+                : "regular";
+        jsonMap.put("variety", variety);
+
+        jsonMap.put("product", order.getProduct());
+        jsonMap.put("order_type", order.getOrder_type());
+        jsonMap.put("quantity", order.getQuantity() != null ? order.getQuantity() : 0L);
+        jsonMap.put("price", order.getPrice() != null ? order.getPrice() : 0.0);
+        jsonMap.put("trigger_price", order.getTrigger_price() != null ? order.getTrigger_price() : 0.0);
+
+        // convert to JSON
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonMap);
+    }
+
 }

@@ -8,6 +8,7 @@ import com.aem.ai.pm.services.AccountRegistryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Modified;
@@ -102,9 +103,7 @@ public class KiteConnector implements BrokerConnector {
             log.info(GREEN + "✅ Positions fetched: {} items" + RESET, positions.size());
 
 // 4️⃣ Fetch margins/funds via REST
-            String marginJson = http.get(cfg.baseUrl() + cfg.fundsEndpoint(), headers,1000);
-            CashSummary cash = mapKiteFunds(marginJson);
-            log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
+            CashSummary cash = getFundsForAccount(headers);
 
             PortfolioSnapshot portfolioSnapshot = new PortfolioSnapshot(holdings, positions, cash, Instant.now());
             portfolioSnapshot.setHoldingsJson(holdingsJson);
@@ -115,6 +114,13 @@ public class KiteConnector implements BrokerConnector {
             log.error(RED + "❌ Error fetching portfolio: {}" + RESET, e.getMessage(), e);
             throw new BrokerException("Kite fetch failed: " + e.getMessage(), -1, e);
         }
+    }
+
+    public @NotNull CashSummary getFundsForAccount(Map<String, String> headers) throws Exception {
+        String marginJson = http.get(cfg.baseUrl() + cfg.fundsEndpoint(), headers,1000);
+        CashSummary cash = mapKiteFunds(marginJson);
+        log.info(GREEN + "✅ Cash summary fetched. Available={} Used={}" + RESET, cash.available, cash.used);
+        return cash;
     }
 
 
@@ -181,12 +187,29 @@ public class KiteConnector implements BrokerConnector {
     }
 
     private CashSummary mapKiteFunds(String json) throws Exception {
+        ObjectMapper om = new ObjectMapper();
+        JsonNode dataNode = om.readTree(json).path("data");
+
         CashSummary c = new CashSummary();
-        JsonNode d = om.readTree(json).path("data").path("equity");
-        c.available = new BigDecimal(d.path("available").path("cash").asText("0"));
-        c.used = new BigDecimal(d.path("utilised").path("debits").asText("0"));
-        c.pnlRealizedToday = new BigDecimal(d.path("pnl").asText("0"));
-        c.pnlUnrealized = BigDecimal.ZERO;
+
+        // Available funds
+        JsonNode available = dataNode.path("available");
+        c.available = new BigDecimal(available.path("live_balance").asText("0"));
+
+        // Used funds
+        JsonNode utilised = dataNode.path("utilised");
+        c.used = new BigDecimal(utilised.path("debits").asText("0"));
+
+        // PnL values (realised/unrealised)
+        c.pnlRealizedToday = new BigDecimal(utilised.path("m2m_realised").asText("0"));
+        c.pnlUnrealized = new BigDecimal(utilised.path("m2m_unrealised").asText("0"));
+
+        // Optional: net balance if needed
+        if (dataNode.has("net")) {
+            c.net = new BigDecimal(dataNode.path("net").asText("0"));
+        }
+
         return c;
     }
+
 }
