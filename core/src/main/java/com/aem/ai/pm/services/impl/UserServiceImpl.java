@@ -34,7 +34,7 @@ public class UserServiceImpl implements UserService {
         log.info(BLUE + "🟦 Starting registerOrUpdate() for externalRef={} email={}" + RESET,
                 user.getExternalRef(), user.getEmail());
 
-        String sql = "INSERT INTO app_user (external_ref, email, full_name, phone, status, created_at, updated_at) " +
+        String sql = "INSERT INTO portfolio_mgmt_app_user (external_ref, email, full_name, phone, status, created_at, updated_at) " +
                 "VALUES (?, ?, ?, ?, ?, NOW(), NOW()) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "email = VALUES(email), " +
@@ -43,18 +43,12 @@ public class UserServiceImpl implements UserService {
                 "status = VALUES(status), " +
                 "updated_at = NOW()";
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
-        if (dataSource == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
 
-        try (Connection conn = dataSource.getConnection();
+
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            log.debug(CYAN + "📥 Preparing SQL Insert/Update for app_user" + RESET);
+            log.debug(CYAN + "📥 Preparing SQL Insert/Update for portfolio_mgmt_app_user" + RESET);
 
             ps.setString(1, user.getExternalRef());
             ps.setString(2, user.getEmail());
@@ -82,7 +76,7 @@ public class UserServiceImpl implements UserService {
 
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in registerOrUpdate: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error saving app_user", e);
+            throw new RuntimeException("Error saving portfolio_mgmt_app_user", e);
         }
     }
 
@@ -91,16 +85,9 @@ public class UserServiceImpl implements UserService {
     public Optional<AppUser> findById(long userId) {
         log.info(BLUE + "🔍 Looking up AppUser with userId={}" + RESET, userId);
 
-        String sql = "SELECT * FROM app_user WHERE user_id=?";
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
-        if (dataSource == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
+        String sql = "SELECT * FROM portfolio_mgmt_app_user WHERE user_id=?";
 
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setLong(1, userId);
@@ -126,7 +113,7 @@ public class UserServiceImpl implements UserService {
 
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in findById: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error finding app_user", e);
+            throw new RuntimeException("Error finding portfolio_mgmt_app_user", e);
         }
 
         return Optional.empty();
@@ -134,23 +121,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Optional<AppUser> findByIdOrEmail(String idOrEmail) {
-        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        if (ds == null) {
-            log.error("❌ DataSource not available for UserService");
-            return Optional.empty();
-        }
+
 
         String sql;
         boolean isNumeric = idOrEmail.matches("\\d+");
         if (isNumeric) {
             sql = "SELECT user_id, email, full_name, phone, status " +
-                    "FROM app_user WHERE user_id = ?";
+                    "FROM portfolio_mgmt_app_user WHERE user_id = ?";
         } else {
             sql = "SELECT user_id, email, full_name, phone, status " +
-                    "FROM app_user WHERE email = ?";
+                    "FROM portfolio_mgmt_app_user WHERE email = ?";
         }
 
-        try (Connection con = ds.getConnection();
+        try (Connection con = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             if (isNumeric) {

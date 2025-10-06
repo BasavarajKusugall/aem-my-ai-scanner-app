@@ -31,9 +31,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
     @Reference
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
-    private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
-    }
+
     @ObjectClassDefinition(name="BSK MarketData Watchlist DAO")
     public @interface Config {
         @AttributeDefinition(name="Upstox table (nifty50 or nifty500)", description="Table with INSTRUMENT_KEY or SYMBOL")
@@ -78,13 +76,7 @@ public class JdbcWatchlistDao implements WatchlistDao {
         List<InstrumentSymbol> watchlist = new ArrayList<>();
         String sql = "SELECT * FROM " + table ;
 
-        DataSource dataSource = getDataSource();
-        if (dataSource == null) {
-            log.error("DataSource for {} is null, cannot read watchlist", table);
-            return watchlist;
-        }
-
-        try (Connection c = dataSource.getConnection();
+        try (Connection c = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 

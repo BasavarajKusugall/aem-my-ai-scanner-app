@@ -50,7 +50,7 @@ public class OHLStrategyScannerImpl implements OHLStrategyScanner {
     )
     public @interface Config {
         @AttributeDefinition(name = "Enable Strategy")
-        boolean enable() default true;
+        boolean enable() default false;
 
         @AttributeDefinition(name = "Tolerance % (0.0015 = 0.15%)")
         double tolerancePct() default 0.0015;

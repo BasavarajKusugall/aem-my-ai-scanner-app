@@ -1,6 +1,5 @@
 package com.aem.ai.pm.dao.impl;
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dao.PortfolioDao;
 import com.aem.ai.pm.dto.*;
@@ -35,20 +34,15 @@ public class PortfolioDaoImpl implements PortfolioDao {
 
     @Override
     public List<UserBrokerAccount> fetchActiveAccounts() {
-       DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        if (dataSource == null) {
-            log.error(RED + "DataSource not found! Cannot perform portfolio sync." + RESET);
-            return null;
-        }
         List<UserBrokerAccount> list = new ArrayList<>();
         String sql = "SELECT account_id, user_id, broker_id, broker_name, broker_account_ref, " +
                 "account_alias, portfolio_holding_json, portfolio_positions_json, telegram_bot_user_id " +
-                "FROM user_broker_account " +
+                "FROM portfolio_mgmt_user_broker_account " +
                 "WHERE status='ACTIVE' " +
                 "AND ((portfolio_holding_json IS NOT NULL AND portfolio_holding_json <> '' AND portfolio_holding_json <> '{}') " +
                 "OR (portfolio_positions_json IS NOT NULL AND portfolio_positions_json <> '' AND portfolio_positions_json <> '{}'))";
 
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -82,7 +76,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
             return;
         }
         try (PreparedStatement ps = c.prepareStatement(
-                "UPDATE user_broker_account " +
+                "UPDATE portfolio_mgmt_user_broker_account " +
                         "SET portfolio_holding_json = ?, " +
                         "    portfolio_positions_json = ? " +
                         "WHERE broker_account_ref = ?")) {
@@ -93,13 +87,13 @@ public class PortfolioDaoImpl implements PortfolioDao {
             ps.setString(3, acc.brokerAccountRef);
 
             int rows = ps.executeUpdate();
-            log.info("{}📥 Updated user_broker_account JSON for ubaId={}, rows={}{}",
+            log.info("{}📥 Updated portfolio_mgmt_user_broker_account JSON for ubaId={}, rows={}{}",
                     GREEN, acc.userBrokerAccountId, rows, RESET);
 
         } catch (Exception e) {
-            log.error("{}❌ Failed to update user_broker_account JSON for ubaId={} : {}{}",
+            log.error("{}❌ Failed to update portfolio_mgmt_user_broker_account JSON for ubaId={} : {}{}",
                     RED, acc.userBrokerAccountId, e.getMessage(), RESET, e);
-            throw new RuntimeException("Failed to update user_broker_account JSON: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to update portfolio_mgmt_user_broker_account JSON: " + e.getMessage(), e);
         }
     }
 
@@ -111,7 +105,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
         try {
             // 1) HOLDINGS
             try (PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO holding(user_broker_account_id, instrument_id, quantity, avg_cost, updated_at) " +
+                    "INSERT INTO portfolio_mgmt_holding(user_broker_account_id, instrument_id, quantity, avg_cost, updated_at) " +
                             "VALUES(?,?,?,?,NOW()) " +
                             "ON DUPLICATE KEY UPDATE quantity=VALUES(quantity), avg_cost=VALUES(avg_cost), updated_at=NOW()")) {
 
@@ -136,7 +130,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
                 log.info("{}⚠️ No positions to upsert for accountId={}{}",
                         YELLOW, acc.userBrokerAccountId, RESET);
                 try (PreparedStatement ps = c.prepareStatement(
-                        "INSERT INTO position(user_broker_account_id, instrument_id, side, quantity, avg_price, pnl_realized, updated_at) " +
+                        "INSERT INTO portfolio_mgmt_position(user_broker_account_id, instrument_id, side, quantity, avg_price, pnl_realized, updated_at) " +
                                 "VALUES(?,?,?,?,?,?,NOW()) " +
                                 "ON DUPLICATE KEY UPDATE side=VALUES(side), quantity=VALUES(quantity), avg_price=VALUES(avg_price), pnl_realized=VALUES(pnl_realized), updated_at=NOW()")) {
 
@@ -162,7 +156,7 @@ public class PortfolioDaoImpl implements PortfolioDao {
 
             // 3) CASH
             try (PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO cash_snapshot(user_broker_account_id, as_of, available, used, created_at) VALUES(?,?,?,?,NOW())")) {
+                    "INSERT INTO portfolio_mgmt_cash_snapshot(user_broker_account_id, as_of, available, used, created_at) VALUES(?,?,?,?,NOW())")) {
                 ps.setLong(1, acc.userBrokerAccountId);
                 ps.setTimestamp(2, Timestamp.from(snap.asOf));
                 ps.setBigDecimal(3, snap.cash.available);

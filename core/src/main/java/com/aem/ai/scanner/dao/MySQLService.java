@@ -1,7 +1,6 @@
 package com.aem.ai.scanner.dao;
 
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -18,14 +17,9 @@ public class MySQLService {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
 
-    private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
-    }
-
 
     public void testQuery() {
-        DataSource dataSource = getDataSource();
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement("SELECT bot_chat_id, chat_type, chat_title, bot_name, bot_token, bot_user_id, purpose, is_group_enabled \" +\n" +
                      "                \"FROM telegram_bot_config WHERE is_active = 1");
              ResultSet rs = ps.executeQuery()) {

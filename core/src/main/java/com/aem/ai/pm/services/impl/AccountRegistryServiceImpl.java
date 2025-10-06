@@ -1,6 +1,5 @@
 package com.aem.ai.pm.services.impl;
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.BrokerAccountRef;
 import com.aem.ai.pm.dto.BrokerToken;
@@ -45,11 +44,8 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
         log.info(BLUE + "🟦 Starting registerOrUpdate() for userId={} brokerId={} ref={}" + RESET,
                 account.getUserId(), account.getBrokerId(), account.getBrokerAccountRef());
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        String sql = "INSERT INTO user_broker_account " +
+        String sql = "INSERT INTO portfolio_mgmt_user_broker_account " +
                 "(user_id, broker_id, broker_account_ref, account_alias, base_currency, status, api_key, api_secret, request_token, broker_name,password) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
@@ -59,7 +55,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
                 "request_token=VALUES(request_token), " +
                 "broker_name=VALUES(broker_name)";
 
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setLong(1, account.getUserId());
@@ -84,7 +80,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
                     log.info(GREEN + "🆔 New AccountId generated: {}" + RESET, generatedId);
                 } else {
                     // Record already existed → fetch existing account_id
-                    String lookupSql = "SELECT account_id FROM user_broker_account WHERE user_id=? AND broker_id=?";
+                    String lookupSql = "SELECT account_id FROM portfolio_mgmt_user_broker_account WHERE user_id=? AND broker_id=?";
                     try (PreparedStatement ps2 = conn.prepareStatement(lookupSql)) {
                         ps2.setLong(1, account.getUserId());
                         ps2.setLong(2, account.getBrokerId());
@@ -105,7 +101,7 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
 
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in registerOrUpdate: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error saving user_broker_account", e);
+            throw new RuntimeException("Error saving portfolio_mgmt_user_broker_account", e);
         }
     }
 
@@ -114,12 +110,10 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
     public Optional<UserBrokerAccount> findById(long accountId) {
         log.info(BLUE + "🔎 Searching for accountId={}" + RESET, accountId);
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
-        String sql = "SELECT * FROM user_broker_account WHERE account_id=?";
 
-        try (Connection conn = dataSource.getConnection();
+        String sql = "SELECT * FROM portfolio_mgmt_user_broker_account WHERE account_id=?";
+
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setLong(1, accountId);
@@ -143,9 +137,19 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
             }
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in findById: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error finding user_broker_account", e);
+            throw new RuntimeException("Error finding portfolio_mgmt_user_broker_account", e);
         }
         return Optional.empty();
+    }
+    public static boolean hasColumn(ResultSet rs, String columnName) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+        for (int i = 1; i <= columnCount; i++) {
+            if (columnName.equalsIgnoreCase(metaData.getColumnLabel(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -154,19 +158,16 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
 
         String sql =
                 "SELECT * " +
-                        "FROM user_broker_account uba " +
-                        "JOIN broker b ON b.broker_id = uba.broker_id " +
-                        "JOIN broker_token tok ON tok.broker_account_id = uba.account_id " +
+                        "FROM portfolio_mgmt_user_broker_account uba " +
+                        "JOIN portfolio_mgmt_broker b ON b.broker_id = uba.broker_id " +
+                        "JOIN portfolio_mgmt_broker_token tok ON tok.broker_account_id = uba.account_id " +
                         "WHERE b.code = ? " +
                         "AND uba.status = 'ACTIVE' " ;
 
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
         List<BrokerAccountRef> out = new ArrayList<>();
-        try (Connection c = dataSource.getConnection();
+        try (Connection c = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
             ps.setString(1, brokerCode);
@@ -180,11 +181,13 @@ public class AccountRegistryServiceImpl implements AccountRegistryService {
                     String requestToken = rs.getString("request_token");
                     String apiSecret = rs.getString("api_secret");
                     String apiKey = rs.getString("api_key");
+                    int approved_funds = hasColumn(rs,"approved_funds")  ? rs.getInt("approved_funds") : 0;
 
                     BrokerAccountRef ref = new BrokerAccountRef(userId, accountId, brokerCode, brokerAccountRef, accessToken, requestToken);
                     ref.setApiKey(apiKey);
                     ref.setApiSecrete(apiSecret);
                     ref.setBrokerAccountRef(brokerAccountRef);
+                    ref.setApprovedFundsPercentage(approved_funds);
 
                     out.add(ref);
 

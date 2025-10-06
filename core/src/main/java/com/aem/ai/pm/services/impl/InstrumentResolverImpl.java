@@ -1,6 +1,5 @@
 package com.aem.ai.pm.services.impl;
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.HoldingItem;
 import com.aem.ai.pm.dto.PositionItem;
@@ -30,20 +29,14 @@ public class InstrumentResolverImpl implements InstrumentResolver {
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
 
-    private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-    }
+
 
     @Override
     public long resolveForHolding(HoldingItem h) {
         log.info(BLUE + "🔍 Resolving Holding: " + RESET +
                 "ISIN=" + h.isin + ", Exchange=" + h.exchange + ", Symbol=" + h.symbol);
-        DataSource dataSource = getDataSource();
-        if (null == dataSource){
-            log.error(RED + "❌ DataSource not found! Cannot resolve Holding instrument." + RESET);
-            throw new RuntimeException("DataSource not found for portfolio management");
-        }
-        try (Connection c = dataSource.getConnection()) {
+
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
             Long id = byIsin(c, h.isin);
             if (id != null) {
                 log.info(GREEN + "✅ Found instrument by ISIN: " + RESET + id);
@@ -74,12 +67,8 @@ public class InstrumentResolverImpl implements InstrumentResolver {
         log.info(BLUE + "🔍 Resolving Position: " + RESET +
                 "Exchange=" + p.exchange + ", Symbol=" + p.symbol +
                 ", Expiry=" + p.expiry + ", Strike=" + p.strike + ", OptType=" + p.optionType);
-        DataSource dataSource = getDataSource();
-        if (dataSource == null ){
-            log.error(RED + "❌ DataSource not found! Cannot resolve Position instrument." + RESET);
-            throw new RuntimeException("DataSource not found for portfolio management");
-        }
-        try (Connection c = dataSource.getConnection()) {
+
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
             Long id = byDerivKey(c, p.exchange, p.symbol, p.expiry, p.strike, p.optionType);
             if (id != null) {
                 log.info(GREEN + "✅ Found derivative instrument: " + RESET + id);
@@ -97,14 +86,14 @@ public class InstrumentResolverImpl implements InstrumentResolver {
             return newId;
 
         } catch (SQLException e) {
-            log.error(RED + "❌ Error resolving Position instrument: " + e.getMessage() + RESET, e);
+            log.error(RED + "❌ Error resolving portfolio_mgmt_position instrument: " + e.getMessage() + RESET, e);
             throw new RuntimeException(e);
         }
     }
 
     private Long byIsin(Connection c, String isin) throws SQLException {
         if (isin == null) return null;
-        try (PreparedStatement ps = c.prepareStatement("SELECT * FROM instrument WHERE isin=?")) {
+        try (PreparedStatement ps = c.prepareStatement("SELECT * FROM portfolio_mgmt_instrument WHERE isin=?")) {
             ps.setString(1, isin);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
@@ -114,7 +103,7 @@ public class InstrumentResolverImpl implements InstrumentResolver {
 
     private Long bySymbol(Connection c, String exch, String sym) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(
-                "SELECT * FROM instrument i JOIN instrument_identifier ii ON ii.instrument_id=i.instrument_id " +
+                "SELECT * FROM portfolio_mgmt_instrument i JOIN portfolio_mgmt_instrument_identifier ii ON ii.instrument_id=i.instrument_id " +
                         "WHERE ii.exchange_code=? AND ii.symbol=?")) {
             ps.setString(1, exch);
             ps.setString(2, sym);
@@ -127,7 +116,7 @@ public class InstrumentResolverImpl implements InstrumentResolver {
     private Long byDerivKey(Connection c, String exch, String sym, String expiry,
                             java.math.BigDecimal strike, String opt) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(
-                "SELECT * FROM instrument WHERE exchange_code=? AND tradingsymbol=? AND expiry_date=? AND strike_price=? AND option_type=?")) {
+                "SELECT * FROM portfolio_mgmt_instrument WHERE exchange_code=? AND tradingsymbol=? AND expiry_date=? AND strike_price=? AND option_type=?")) {
             ps.setString(1, exch);
             ps.setString(2, sym);
             ps.setString(3, expiry);
@@ -141,7 +130,7 @@ public class InstrumentResolverImpl implements InstrumentResolver {
 
     private long insertStub(Connection c, String exch, String sym, String type, String isin) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO instrument(instrument_type, exchange_code, tradingsymbol, isin, created_at, updated_at)" +
+                "INSERT INTO portfolio_mgmt_instrument(instrument_type, exchange_code, tradingsymbol, isin, created_at, updated_at)" +
                         "VALUES (?, ?, ?, ?, NOW(), NOW())" +
                         "ON DUPLICATE KEY UPDATE" +
                         "  updated_at = NOW()," +

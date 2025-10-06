@@ -1,14 +1,20 @@
 package com.aem.ai.scanner.model;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.reports.ReportGenerator;
 import org.ta4j.core.reports.TradingStatement;
 
+import java.io.IOException;
 import java.io.StringWriter;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -24,8 +30,17 @@ public class BacktestReportGenerator implements ReportGenerator<String> {
 
         // configure mapper once
         this.mapper = new ObjectMapper();
-        this.mapper.findAndRegisterModules();
-        this.mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // readable ISO-8601
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(Duration.class, new JsonSerializer<Duration>() {
+            @Override
+            public void serialize(Duration value, JsonGenerator gen, SerializerProvider serializers)
+                    throws IOException {
+                // Convert Duration to readable string
+                gen.writeString(value.toString()); // e.g. PT1H → “PT1H”
+            }
+        });
+
+        mapper.registerModule(module);
     }
 
     @Override
@@ -49,7 +64,7 @@ public class BacktestReportGenerator implements ReportGenerator<String> {
 
     public String generateJson() {
         try {
-            return mapper.writerWithDefaultPrettyPrinter()
+            return mapper
                     .writeValueAsString(tradingStatements);
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate JSON", e);

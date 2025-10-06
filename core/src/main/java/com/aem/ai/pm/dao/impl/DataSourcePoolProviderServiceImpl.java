@@ -1,26 +1,23 @@
 package com.aem.ai.pm.dao.impl;
 
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
-import com.aem.ai.pm.utils.OsgiUtils;
-import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.InvalidSyntaxException;
-import org.osgi.framework.ServiceReference;
-import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.*;
-import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 @Component(service = DataSourcePoolProviderService.class, immediate = true)
 public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProviderService {
-
     private static final Logger log = LoggerFactory.getLogger(DataSourcePoolProviderServiceImpl.class);
 
-    private ServiceTracker<DataSource, DataSource> tracker;
-    private BundleContext bundleContext;
+    @Reference
+    private DataSource dataSource;
+    //private ServiceTracker<DataSource, DataSource> tracker;
+    //private BundleContext bundleContext;
+
 
     // ANSI colors for logs
     private static final String RESET  = "\u001B[0m";
@@ -29,7 +26,7 @@ public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProvider
     private static final String YELLOW = "\u001B[33m";
     private static final String CYAN   = "\u001B[36m";
 
-    @Activate
+    /*@Activate
     protected void activate(ComponentContext ctx) {
         this.bundleContext = ctx.getBundleContext();
 
@@ -37,20 +34,25 @@ public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProvider
         tracker = new ServiceTracker<>(bundleContext, DataSource.class, null);
         tracker.open();
         log.info("{}✅ ServiceTracker for DataSource started{}", GREEN, RESET);
-    }
+    }*/
 
-    @Deactivate
+   /* @Deactivate
     protected void deactivate() {
         if (tracker != null) {
             tracker.close();
             tracker = null;
             log.info("{}🛑 ServiceTracker for DataSource stopped{}", YELLOW, RESET);
         }
-    }
+    }*/
 
     @Override
-    public DataSource getDataSourceByName(String name) {
-        // Primary approach: use ServiceTracker if initialized
+    public Connection getConnection() throws SQLException {
+        if (dataSource != null) {
+
+            log.info("{}✅ Returning injected DataSource instance for name={}{}", GREEN,  RESET);
+            return dataSource.getConnection();
+        }
+        /*// Primary approach: use ServiceTracker if initialized
         if (tracker != null) {
             ServiceReference<DataSource>[] refs = tracker.getServiceReferences();
             if (refs != null) {
@@ -102,9 +104,9 @@ public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProvider
             }
         } else {
             log.error("{}❌ BundleContext is null. Cannot lookup DataSource{}", RED, RESET);
-        }
+        }*/
 
-        log.warn("{}⚠️ No DataSource found with name={}{}", RED, name, RESET);
+        log.error("{}⚠️ No DataSource found with name={}{}", RED,  RESET);
         return null;
     }
 }

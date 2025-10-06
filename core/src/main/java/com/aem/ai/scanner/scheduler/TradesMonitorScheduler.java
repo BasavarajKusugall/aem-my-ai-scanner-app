@@ -57,6 +57,11 @@ public class TradesMonitorScheduler implements Runnable {
     private DAOFactory daoFactory;
 
 
+    @Reference
+    private LiveScannerNSE liveScannerNSE;
+
+    @Reference
+    private LiveScannerDeltaExchange liveScannerDeltaExchange;
 
     @Reference
     private StrategyFactoryService strategyFactoryService;
@@ -100,15 +105,17 @@ public class TradesMonitorScheduler implements Runnable {
             List<TradeModel> openTradesList;
             if (GenericeConstants.UPSTOX.equalsIgnoreCase(code)) {
                 String stocksTradeTable = GenericeConstants.STOCK_TRADES_TABLE;
-               /* if (liveScannerNSE != null){
+                if (liveScannerNSE != null){
                      stocksTradeTable = liveScannerNSE.getStocksTradeTable();
-                }*/
+                }
+                log.info("Using stocksTradeTable {} for broker {}", stocksTradeTable, code);
                 openTradesList = daoFactory.listAllOpenTrades(stocksTradeTable);
             } else if (GenericeConstants.DELTA.equalsIgnoreCase(code)) {
                 String cryptoTradeTable = GenericeConstants.CURRENCY_TRADES_TABLE;
-                /*if (liveScannerDeltaExchange != null){
+                if (liveScannerDeltaExchange != null){
                     cryptoTradeTable = liveScannerDeltaExchange.getCryptoTradeTable();
-                }*/
+                }
+                log.info("Using cryptoTradeTable {} for broker {}", cryptoTradeTable, code);
                 openTradesList = daoFactory.listAllOpenTrades(cryptoTradeTable);
             } else {
                 log.info("Skipping unknown broker {}", code);
@@ -126,7 +133,7 @@ public class TradesMonitorScheduler implements Runnable {
                     int barCount = tfs.get(timeFrame);
                     //todo iterate trades
                     //todo get the timeframe from the trade and extract the barCount from tf for that timeframe
-                    //todo fetch candles for that timeframe and count
+                    //todo fetch candles for 5min and count
                     //todo build series
             }
         }

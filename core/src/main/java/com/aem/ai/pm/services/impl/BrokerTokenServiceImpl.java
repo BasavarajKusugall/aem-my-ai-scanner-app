@@ -32,28 +32,20 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
 
     @Override
     public UserBrokerAccount findUserBrokerAccountByBrokerAccountRef( String brokerAccountRef) {
-        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        if (ds == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
-
-        // Join app_user + user_broker_account + broker_token
+        // Join portfolio_mgmt_app_user + portfolio_mgmt_user_broker_account + portfolio_mgmt_broker_token
         String sql = "SELECT u.user_id, u.email, u.full_name, u.phone, u.status AS user_status, " +
                 "uba.account_id, uba.broker_id, uba.broker_name, uba.broker_account_ref, " +
                 "uba.account_alias, uba.base_currency, uba.status AS account_status, " +
                 "uba.api_key, uba.api_secret, uba.request_token, " +
                 "uba.telegram_bot_user_id, uba.portfolio_positions_json, uba.portfolio_holding_json, " +
                 "bt.id AS broker_token_id, bt.access_token AS token_access_token, bt.token_expiry " +
-                "FROM app_user u " +
-                "INNER JOIN user_broker_account uba ON u.user_id = uba.user_id " +
-                "INNER JOIN broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
+                "FROM portfolio_mgmt_app_user u " +
+                "INNER JOIN portfolio_mgmt_user_broker_account uba ON u.user_id = uba.user_id " +
+                "INNER JOIN portfolio_mgmt_broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
                 "WHERE uba.broker_account_ref=?";
 
-        try (Connection conn = ds.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, brokerAccountRef);
@@ -91,28 +83,20 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
 
     @Override
     public UserBrokerAccount findUserBrokerAccount(String email, String brokerName, String brokerAccountRef) {
-        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        if (ds == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
-
-        // Join app_user + user_broker_account + broker_token
+        // Join portfolio_mgmt_app_user + portfolio_mgmt_user_broker_account + portfolio_mgmt_broker_token
         String sql = "SELECT u.user_id, u.email, u.full_name, u.phone, u.status AS user_status, " +
                 "uba.account_id, uba.broker_id, uba.broker_name, uba.broker_account_ref, " +
                 "uba.account_alias, uba.base_currency, uba.status AS account_status, " +
                 "uba.api_key, uba.api_secret, uba.request_token, " +
                 "uba.telegram_bot_user_id, uba.portfolio_positions_json, uba.portfolio_holding_json, " +
                 "bt.id AS broker_token_id, bt.access_token AS token_access_token, bt.token_expiry " +
-                "FROM app_user u " +
-                "INNER JOIN user_broker_account uba ON u.user_id = uba.user_id " +
-                "INNER JOIN broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
+                "FROM portfolio_mgmt_app_user u " +
+                "INNER JOIN portfolio_mgmt_user_broker_account uba ON u.user_id = uba.user_id " +
+                "INNER JOIN portfolio_mgmt_broker_token bt ON uba.account_id = bt.broker_account_id AND u.user_id = bt.user_id " +
                 "WHERE u.email=? AND uba.broker_account_ref=?";
 
-        try (Connection conn = ds.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, email);
@@ -169,21 +153,14 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
     public BrokerToken updateAccessTokenByRef(String brokerAccountRef, String newAccessToken) {
         log.info(BLUE + "🔄 Updating access_token for broker_account_ref={}" + RESET, brokerAccountRef);
 
-        String sql = "UPDATE broker_token bt " +
-                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+        String sql = "UPDATE portfolio_mgmt_broker_token bt " +
+                "INNER JOIN portfolio_mgmt_user_broker_account uba ON bt.broker_account_id = uba.account_id " +
                 "SET bt.access_token = ?, bt.token_expiry = NOW() " +
                 "WHERE uba.broker_account_ref = ?";
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        if (dataSource == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
 
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, newAccessToken);
@@ -211,15 +188,13 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
      */
     public BrokerToken findBrokerTokenByRef(String brokerAccountRef) {
         String sql = "SELECT * " +
-                "FROM broker_token bt " +
-                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+                "FROM portfolio_mgmt_broker_token bt " +
+                "INNER JOIN portfolio_mgmt_user_broker_account uba ON bt.broker_account_id = uba.account_id " +
                 "WHERE uba.broker_account_ref = ?";
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        try (Connection conn = dataSource.getConnection();
+
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, brokerAccountRef);
 
@@ -254,26 +229,19 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
                 token.getBrokerAccountId(), token.getUserId());
 
         // Note: token_expiry is always NOW()
-        String sql = "INSERT INTO broker_token " +
+        String sql = "INSERT INTO portfolio_mgmt_broker_token " +
                 "(user_id, broker_account_id, access_token,broker_name, token_expiry) " +
                 "VALUES (?, ?, ?,?, NOW()) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "broker_account_id=VALUES(broker_account_id), " +
                 "token_expiry=NOW()";
 
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
 
-        if (dataSource == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
 
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            log.debug(CYAN + "📥 Preparing SQL Insert/Update for broker_token" + RESET);
+            log.debug(CYAN + "📥 Preparing SQL Insert/Update for portfolio_mgmt_broker_token" + RESET);
 
             ps.setLong(1, token.getUserId());
             ps.setLong(2, userBrokerAccount.getAccountId());
@@ -300,7 +268,7 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
 
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in saveOrUpdate: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error saving broker_token", e);
+            throw new RuntimeException("Error saving portfolio_mgmt_broker_token", e);
         }
     }
 
@@ -308,17 +276,9 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
     public Optional<BrokerToken> findByAccount(long brokerAccountId) {
         log.info(BLUE + "🔍 Looking up BrokerToken for brokerAccountId={}" + RESET, brokerAccountId);
 
-        String sql = "SELECT * FROM broker_token WHERE broker_account_id=?";
-        DataSource dataSource = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
+        String sql = "SELECT * FROM portfolio_mgmt_broker_token WHERE broker_account_id=?";
 
-        if (dataSource == null) {
-            log.error(RED + "❌ DataSource not found: {}" + RESET, GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-            throw new RuntimeException("DataSource not found for name: " + GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        }
-
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setLong(1, brokerAccountId);
@@ -350,25 +310,21 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
             }
         } catch (SQLException e) {
             log.error(RED + "❌ SQL Error in findByAccount: {}" + RESET, e.getMessage(), e);
-            throw new RuntimeException("Error finding broker_token", e);
+            throw new RuntimeException("Error finding portfolio_mgmt_broker_token", e);
         }
 
         return Optional.empty();
     }
     @Override
     public long registerOrUpdate(String code, String name, String apiBaseUrl) {
-        String sql = "INSERT INTO broker (code, name, api_base_url, status, created_at) " +
+        String sql = "INSERT INTO portfolio_mgmt_broker (code, name, api_base_url, status, created_at) " +
                 "VALUES (?, ?, ?, 'ACTIVE', NOW()) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "name = VALUES(name), " +
                 "api_base_url = VALUES(api_base_url), " +
                 "status = VALUES(status)";
 
-        DataSource ds = dataSourcePoolProviderService.getDataSourceByName(
-                GenericeConstants.MYSQL_PORTFOLIO_MGMT
-        );
-
-        try (Connection conn = ds.getConnection();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, code);
@@ -387,7 +343,7 @@ public class BrokerTokenServiceImpl implements BrokerTokenService {
             }
 
             // If not new, fetch broker_id by code
-            try (PreparedStatement ps2 = conn.prepareStatement("SELECT broker_id FROM broker WHERE code=?")) {
+            try (PreparedStatement ps2 = conn.prepareStatement("SELECT broker_id FROM portfolio_mgmt_broker WHERE code=?")) {
                 ps2.setString(1, code);
                 try (ResultSet rs2 = ps2.executeQuery()) {
                     if (rs2.next()) {

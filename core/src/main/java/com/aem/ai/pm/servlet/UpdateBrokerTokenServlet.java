@@ -23,7 +23,7 @@ import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 /**
- * Updates broker_token access_token based on email + brokerAccountRef
+ * Updates portfolio_mgmt_broker_token access_token based on email + brokerAccountRef
  */
 @Component(
         service = Servlet.class,

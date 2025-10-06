@@ -1,6 +1,5 @@
 package com.aem.ai.pm.connectors.kite.impl;
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.connectors.kite.KiteAuthService;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.pm.dto.UserBrokerAccount;
@@ -13,7 +12,6 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -34,9 +32,7 @@ public class KiteAuthServiceImpl implements KiteAuthService {
     private static final ObjectMapper om = new ObjectMapper();
     private String sql;
 
-    private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-    }
+
 
 
     @Override
@@ -104,11 +100,11 @@ public class KiteAuthServiceImpl implements KiteAuthService {
             return null;
         }
 
-        try (Connection con = getDataSource().getConnection();
+        try (Connection con = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = con.prepareStatement(
                      "SELECT *\n" +
-                             "\t FROM user_broker_account uba \t" +
-                             "\t INNER JOIN broker_token bt \t" +
+                             "\t FROM portfolio_mgmt_user_broker_account uba \t" +
+                             "\t INNER JOIN portfolio_mgmt_broker_token bt \t" +
                              "    ON bt.id = uba.account_id \t" +
                              "WHERE \t " +
                              "  \t uba.broker_account_ref = ?"
@@ -130,9 +126,9 @@ public class KiteAuthServiceImpl implements KiteAuthService {
 
     private void upsertBrokerToken(Long brokerAccountId, long userId, String brokerName,
                                    String accessToken, String refreshToken, String tokenExpiry, String brokerAccountRef) {
-        try (Connection con = getDataSource().getConnection()) {
+        try (Connection con = dataSourcePoolProviderService.getConnection()) {
             // Create table if not exists
-            String createTableSQL = "CREATE TABLE IF NOT EXISTS broker_token (" +
+            String createTableSQL = "CREATE TABLE IF NOT EXISTS portfolio_mgmt_broker_token (" +
                     "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
                     "user_id BIGINT NOT NULL," +
                     "broker_account_id BIGINT NOT NULL," +
@@ -148,7 +144,7 @@ public class KiteAuthServiceImpl implements KiteAuthService {
             try (PreparedStatement ps = con.prepareStatement(createTableSQL)) { ps.execute(); }
 
             // Upsert token
-            String upsertSQL = "INSERT INTO broker_token " +
+            String upsertSQL = "INSERT INTO portfolio_mgmt_broker_token " +
                     "(user_id, broker_account_id,broker_account_ref, broker_name, access_token, refresh_token, token_expiry) " +
                     "VALUES (?, ?,?, ?, ?, ?, ?) " +
                     "ON DUPLICATE KEY UPDATE " +
@@ -173,16 +169,16 @@ public class KiteAuthServiceImpl implements KiteAuthService {
             }
 
         } catch (Exception e) {
-            log.error("Exception during broker_token insert/update: {}", e.getMessage(), e);
+            log.error("Exception during portfolio_mgmt_broker_token insert/update: {}", e.getMessage(), e);
         }
     }
 
     // Fetch existing access token from DB
     private String fetchExistingAccessToken( String brokerAccountRef) {
-        sql = "SELECT bt.access_token FROM broker_token bt " +
-                "INNER JOIN user_broker_account uba ON bt.broker_account_id = uba.account_id " +
+        sql = "SELECT bt.access_token FROM portfolio_mgmt_broker_token bt " +
+                "INNER JOIN portfolio_mgmt_user_broker_account uba ON bt.broker_account_id = uba.account_id " +
                 "WHERE uba.broker_account_ref = ?";
-        try (Connection con = getDataSource().getConnection();
+        try (Connection con = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = con.prepareStatement(
                      sql
              )) {

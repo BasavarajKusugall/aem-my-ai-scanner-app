@@ -1,6 +1,5 @@
 package com.aem.ai.pm.services.impl;
 
-import com.aem.GenericeConstants;
 import com.aem.ai.pm.config.PortfolioSyncConfig;
 import com.aem.ai.pm.connectors.BrokerConnector;
 import com.aem.ai.pm.dao.DataSourcePoolProviderService;
@@ -52,12 +51,6 @@ public class PortfolioSyncServiceImpl implements PortfolioSyncService {
     public void syncAllBrokersOnce() {
         if (!cfg.enabled()) {
             log.info(YELLOW + "Portfolio sync disabled" + RESET);
-            return;
-        }
-
-        dataSource = dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.MYSQL_PORTFOLIO_MGMT);
-        if (dataSource == null) {
-            log.error(RED + "DataSource not found! Cannot perform portfolio sync." + RESET);
             return;
         }
 

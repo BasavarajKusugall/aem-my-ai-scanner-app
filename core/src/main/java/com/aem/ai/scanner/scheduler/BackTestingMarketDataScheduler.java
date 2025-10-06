@@ -234,13 +234,13 @@ public class BackTestingMarketDataScheduler implements Runnable {
                     reportGen.generateCsv(),
                     "text/csv"
             );
-
+/*
             reportStorageService.storeReport(
                     "/var/mytrades",
                     symbol.getSymbol() + "_" + timeframe + ".json",
                     reportGen.generateJson(),
                     "application/json"
-            );
+            );*/
 
             reportStorageService.storeReport(
                     "/var/mytrades",

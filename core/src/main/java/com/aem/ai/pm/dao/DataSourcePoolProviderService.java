@@ -1,7 +1,8 @@
 package com.aem.ai.pm.dao;
 
-import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 public interface DataSourcePoolProviderService {
-    DataSource getDataSourceByName(String name);
+    Connection getConnection() throws SQLException;
 }

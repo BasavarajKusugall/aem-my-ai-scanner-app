@@ -51,6 +51,8 @@ public class TelegramRegisterServlet extends SlingAllMethodsServlet {
             logColored(RED, "[ERROR] Missing apiKey param");
             return;
         }
+        String purpose = request.getParameter("purpose");
+
 
         try {
             // Call Telegram API getMe
@@ -81,6 +83,7 @@ public class TelegramRegisterServlet extends SlingAllMethodsServlet {
 
                 long botUserId = telegramConfig.getBotUserId();
                 String username = telegramConfig.getUsername();
+                telegramConfig.setPurpose(purpose != null ? purpose : "GENERAL");
 
                 // Use DAO to fetch existing config
                 List<TelegramConfig> existingConfigs = daoFactory.fetchTelegramBotUserIDConfigs(String.valueOf(botUserId));

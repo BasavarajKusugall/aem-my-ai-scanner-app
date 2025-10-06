@@ -31,6 +31,33 @@ public class TradeModel {
     private double ltp;
     private double pnlPercentage;
     private PivotLevels pivotLevels;
+    private String brokerAccountRef;
+    private int liveOrderId;
+    private int liveTradeId;
+
+    public String getBrokerAccountRef() {
+        return brokerAccountRef;
+    }
+
+    public void setBrokerAccountRef(String brokerAccountRef) {
+        this.brokerAccountRef = brokerAccountRef;
+    }
+
+    public int getLiveOrderId() {
+        return liveOrderId;
+    }
+
+    public void setLiveOrderId(int liveOrderId) {
+        this.liveOrderId = liveOrderId;
+    }
+
+    public int getLiveTradeId() {
+        return liveTradeId;
+    }
+
+    public void setLiveTradeId(int liveTradeId) {
+        this.liveTradeId = liveTradeId;
+    }
 
     public void setLtp(double ltp) {
         this.ltp = ltp;
@@ -232,6 +259,7 @@ public class TradeModel {
                 "tradeId='" + tradeId + '\'' +
                 ", orderType='" + orderType + '\'' +
                 ", timeFrame='" + timeFrame + '\'' +
+                ", reason='" + reason + '\'' +
                 ", symbol=" + symbol +
                 ", side=" + side +
                 ", entryPrice=" + entryPrice +
@@ -245,6 +273,10 @@ public class TradeModel {
                 ", pnl=" + pnl +
                 ", ltp=" + ltp +
                 ", pnlPercentage=" + pnlPercentage +
+                ", pivotLevels=" + pivotLevels +
+                ", brokerAccountRef='" + brokerAccountRef + '\'' +
+                ", liveOrderId=" + liveOrderId +
+                ", liveTradeId=" + liveTradeId +
                 '}';
     }
 }

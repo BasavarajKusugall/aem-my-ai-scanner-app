@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 // Similarly check the target with pivot levels.
 @Designate(ocd = LiveScannerNSE.Config.class)
 @Component(
-        service = Runnable.class,
+        service = {Runnable.class,LiveScannerNSE.class},
         immediate = true,
         property = {
                 "scheduler.name=LiveScannerNSE"

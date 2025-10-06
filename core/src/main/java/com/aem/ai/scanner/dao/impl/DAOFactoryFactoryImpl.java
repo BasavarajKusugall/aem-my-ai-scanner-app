@@ -5,6 +5,7 @@ import com.aem.ai.pm.dao.DataSourcePoolProviderService;
 import com.aem.ai.scanner.dao.DAOConfig;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.model.*;
+import com.aem.ai.scanner.utils.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Activate;
@@ -29,32 +30,20 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     @Reference
     private DataSourcePoolProviderService dataSourcePoolProviderService;
 
-    private DataSource getDataSource() {
-        return dataSourcePoolProviderService.getDataSourceByName(GenericeConstants.DB_ALGO_DB);
-    }
+
     @Activate
     protected void activate(DAOConfig config) {
         logger.info("TradeDAO activated with DataSource: {}", config.datasourceName());
     }
 
 
-    private Connection conn() throws SQLException {
-        DataSource dataSource = getDataSource();
-        Connection connection = dataSource.getConnection();
-        if (connection != null){
-            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-            connection.setAutoCommit(true); // ensure commit per statement
-            return connection;
-        }
-        return null;
-    }
 
     // -------------------- WATCHLIST --------------------
     public List<InstrumentSymbol> readWatchlistFromDb() {
         List<InstrumentSymbol> watchlist = new ArrayList<>();
         String sql = "SELECT * FROM nifty500_watchlist";
 
-        try (Connection conn = conn();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -78,7 +67,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 "\t  SET comments = CONCAT(COALESCE(comments, ''), CASE WHEN comments IS NULL OR comments = '' THEN '' ELSE '\n' END, ?), " +
                 "    last_updated = CURRENT_TIMESTAMP " +
                 "WHERE symbol = ? AND side = ? AND status = 'OPEN'";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, comment);
             ps.setString(2, symbol.getSymbol());
             ps.setString(3, side.name());
@@ -87,7 +76,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     }
     public boolean insertTradeIfNoOpen(TradeModel t, TradeAnalysis analysis,String tableName) throws SQLException {
         String sel = "SELECT trade_id FROM "+tableName+" WHERE symbol = ? AND side = ? AND status='OPEN' FOR UPDATE";
-        try (Connection c = conn()) {
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
             c.setAutoCommit(false);
             try (PreparedStatement ps = c.prepareStatement(sel)) {
                 ps.setString(1, t.getSymbol().getSymbol());
@@ -119,7 +108,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 "recommended_trade_timeframe, can_take_trade, final_verdict, GeminiAnalysis,R1,R2,R3,S1,S2,S3" +
                 ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             if (StringUtils.containsIgnoreCase(tableName,"currency_trades")){
                 ps.setString(1, GenericeConstants.CRYPTO);
             }else {
@@ -177,7 +166,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     // -------------------- FIND OPEN TRADE --------------------
     public Optional<TradeModel> findOpenBySymbolAndSide(InstrumentSymbol symbol, Signal.Side side,String tableName) throws SQLException {
         String sql = "SELECT * FROM "+tableName+" WHERE symbol = ? AND side = ? AND status = 'OPEN' ORDER BY entry_time DESC LIMIT 1";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, symbol.getSymbol()); // fix: use display symbol (not instrument key)
             ps.setString(2, side.name());
             try (ResultSet rs = ps.executeQuery()) {
@@ -201,7 +190,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         if (t.getEntryPrice() != 0) pnlPercentage = (perUnit / t.getEntryPrice()) * 100.0;
 
         String sql = "UPDATE "+tableName+" SET ltp = ?, pnl = ?, pnl_percentage = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, ltp);
             ps.setDouble(2, totalPnl);
             ps.setDouble(3, pnlPercentage);
@@ -218,7 +207,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             sql += ", Reason = '" + reason.replace("'", "''") + "'";
         }
         sql += " WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, t.getExitPrice());
             ps.setTimestamp(2, Timestamp.valueOf(t.getExitTime()));
             ps.setDouble(3, t.getPnl());
@@ -233,7 +222,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         String sql = "SELECT * FROM "+tableName+" WHERE  orderType = ?   AND symbol = ?   AND side = ?   AND status = 'OPEN'; ";
         logger.info("Listing open trades with SQL: {}", sql);
         List<TradeModel> tradeModels = new ArrayList<>();
-        try (Connection c = conn(); ) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); ) {
             String ordertType = StringUtils.contains(timeframe, "m") ? GenericeConstants.ORDER_TYPE_MIS : GenericeConstants.ORDER_TYPE_CNC;
             PreparedStatement ps = c.prepareStatement(sql);
             ps.setString(1,ordertType);
@@ -294,7 +283,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
             sql += dynamicFilter;
         }
 
-        try (Connection conn = conn();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -344,6 +333,12 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         double s3 = rs.getDouble("S3");
         PivotLevels pivotLevels = new PivotLevels(pivot,r1, r2, r3, s1, s2, s3);
         tradeModel.setPivotLevels(pivotLevels);
+        String broker_account_ref = Utils.hasColumn(rs, "broker_account_ref") ? rs.getString("broker_account_ref") : null;
+        tradeModel.setBrokerAccountRef(broker_account_ref);
+        int live_order_id = Utils.hasColumn(rs, "live_order_id") ? rs.getInt("live_order_id") : null;
+        tradeModel.setLiveOrderId(live_order_id);
+        int live_trade_id = Utils.hasColumn(rs, "live_trade_id") ? rs.getInt("live_trade_id") : null;
+        tradeModel.setLiveTradeId(live_trade_id);
         // try to set LTP/pnl_percentage if present
         try {
             double ltp = rs.getDouble("ltp");
@@ -360,7 +355,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         List<StrategyConfig> strategies = new ArrayList<>();
         String sql = "SELECT id, name, symbol, timeframe, json_config FROM strategies WHERE status='ACTIVE'";
         ObjectMapper mapper = new ObjectMapper();
-        try (Connection conn = conn();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -385,7 +380,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         String selectSql = "SELECT BEST_STRATEGY FROM " + watchListTable + " WHERE SYMBOL=?";
         String updateSql = "UPDATE " + watchListTable + " SET BEST_STRATEGY=? WHERE SYMBOL=?";
 
-        try (Connection c = conn()) {
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
             ObjectMapper mapper = new ObjectMapper();
             List<StrategyResult> existing = new ArrayList<>();
 
@@ -437,7 +432,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 ps.setString(1, newJson);
                 ps.setString(2, symbol);
                 ps.executeUpdate();
-                logger.info("🏆 Persisted BEST_STRATEGY for {} -> {}", symbol, newJson);
+                logger.debug("🏆 Persisted BEST_STRATEGY for {} -> {}", symbol, newJson);
             }
 
         } catch (Exception e) {
@@ -450,7 +445,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     public List<TradeModel> listOpenTradesForSymbol(String symbol,String tableName) throws SQLException {
         String sql = "SELECT * FROM "+tableName+" WHERE status = 'OPEN' AND symbol = '"+symbol+"'";
         List<TradeModel> tradeModels = new ArrayList<>();
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) tradeModels.add(mapRow(rs));
         }
@@ -461,7 +456,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     public List<TradeModel> listForceClosedTradesForSymbol(String symbol,String tableName) throws SQLException {
         String sql = "SELECT * FROM "+tableName+" WHERE Reason = 'Market closed -FORCE  MIS exit' AND symbol = '"+symbol+"'";
         List<TradeModel> tradeModels = new ArrayList<>();
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql);
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) tradeModels.add(mapRow(rs));
         }
@@ -476,7 +471,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         List<InstrumentSymbol> watchlist = new ArrayList<>();
         String sql = "SELECT * FROM " + tableName;
 
-        try (Connection conn = conn();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -499,7 +494,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     @Override
     public Optional<TradeModel> getTradeById(String tradeId, String tableName) throws SQLException {
         String sql = "SELECT * FROM " + tableName + " WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, tradeId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return Optional.of(mapRow(rs));
@@ -512,7 +507,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     @Override
     public void updateQuantity(String tradeId, int newQuantity, String tableName) throws SQLException {
         String sql = "UPDATE " + tableName + " SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, newQuantity);
             ps.setString(2, tradeId);
             ps.executeUpdate();
@@ -523,7 +518,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     @Override
     public void closeTrade(String tradeId, double exitPrice, String reason, String tableName) throws SQLException {
         String sql = "UPDATE " + tableName + " SET status = 'CLOSED', exit_price = ?, exit_time = ?, Reason = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDouble(1, exitPrice);
             ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
             ps.setString(3, reason);
@@ -559,7 +554,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 "is_group_enabled=?, priority=?, is_active=?, updated_at=CURRENT_TIMESTAMP " +
                 "WHERE bot_user_id=?";
 
-        try (Connection c = conn()) {
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
             // Check existence
             boolean exists;
             try (PreparedStatement ps = c.prepareStatement(selectSql)) {
@@ -620,7 +615,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
 
         String sql = String.format(QUERY, inClause);
 
-        try (Connection connection = conn(); Statement stmt = connection.createStatement();
+        try (Connection connection = dataSourcePoolProviderService.getConnection(); Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 result.put(rs.getString("trading_symbol"), rs.getString("instrument_key"));
@@ -642,7 +637,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
                 "confindence_score = VALUES(confindence_score), " +
                 "market_bias = VALUES(market_bias)";
 
-        try (Connection conn = conn();
+        try (Connection conn = dataSourcePoolProviderService.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, symbol);
@@ -669,7 +664,7 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
     public List<TradeModel> listAllOpenTrades(String tableName) {
         String sql = "SELECT * FROM "+tableName+" WHERE status = 'OPEN'; ";
         List<TradeModel> tradeModels = new ArrayList<>();
-        try (Connection c = conn(); ) {
+        try (Connection c = dataSourcePoolProviderService.getConnection(); ) {
             PreparedStatement ps = Objects.requireNonNull(c).prepareStatement(sql);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) tradeModels.add(mapRow(rs));
