@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Designate(ocd = LiveScannerDeltaExchange.Config.class)
 @Component(
-        service ={Runnable.class, LiveScannerDeltaExchange.class},
+        service =Runnable.class,
         immediate = true,
         property = {
                 "scheduler.name=LiveScannerDeltaExchange"

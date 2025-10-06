@@ -675,5 +675,129 @@ public class DAOFactoryFactoryImpl implements DAOFactory {
         return tradeModels;
     }
 
+    /**
+     * Update stop loss for an open trade in a safe, atomic manner.
+     *
+     * Rules:
+     *  - Only update trades whose status = 'OPEN'
+     *  - For BUY trades: allow update only if newStopLoss > current stop_loss (i.e. tighten upward)
+     *  - For SELL trades: allow update only if newStopLoss < current stop_loss (i.e. tighten downward)
+     *  - Uses SELECT ... FOR UPDATE to lock row and avoid races
+     *
+     * @param trade TradeModel instance (must contain tradeId and side)
+     * @param newStopLoss new stop loss value to persist
+     * @param tableName trade table name (e.g. stock_trades / currency_trades)
+     * @throws SQLException on DB errors
+     */
+    public void updateStopLoss(TradeModel trade, double newStopLoss, String tableName) throws SQLException {
+        if (trade == null || StringUtils.isEmpty(trade.getTradeId())) {
+            logger.warn("updateStopLoss called with null/invalid trade, skipping");
+            return;
+        }
+
+        // Guard invalid stop values
+        if (Double.isNaN(newStopLoss) || Double.isInfinite(newStopLoss)) {
+            logger.warn("updateStopLoss called with invalid newStopLoss={} for trade {}", newStopLoss, trade.getTradeId());
+            return;
+        }
+
+        final String selectSql = "SELECT stop_loss, status FROM " + tableName + " WHERE trade_id = ? FOR UPDATE";
+        final String updateSql = "UPDATE " + tableName + " SET stop_loss = ?, last_updated = CURRENT_TIMESTAMP WHERE trade_id = ? AND status = 'OPEN'";
+
+        try (Connection c = dataSourcePoolProviderService.getConnection()) {
+            // Use transaction to ensure atomic read+update
+            boolean previousAutoCommit = c.getAutoCommit();
+            try {
+                c.setAutoCommit(false);
+
+                Double currentStop = null;
+                String currentStatus = null;
+                try (PreparedStatement ps = c.prepareStatement(selectSql)) {
+                    ps.setString(1, trade.getTradeId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            // read current stop and status
+                            currentStop = rs.getObject("stop_loss") != null ? rs.getDouble("stop_loss") : null;
+                            currentStatus = rs.getString("status");
+                        } else {
+                            logger.warn("Trade {} not found in {} - skipping stoploss update", trade.getTradeId(), tableName);
+                            c.commit();
+                            return;
+                        }
+                    }
+                }
+
+                if (!GenericeConstants.OPEN.equalsIgnoreCase(currentStatus)) {
+                    logger.info("Trade {} is not OPEN (status={}), skipping stop loss update", trade.getTradeId(), currentStatus);
+                    c.commit();
+                    return;
+                }
+
+                // Determine if the newStopLoss tightens (doesn't widen) the existing stop
+                boolean allowUpdate = false;
+                if (trade.getSide() == Signal.Side.BUY) {
+                    // For BUY, stoploss moves upward to lock profits: newStopLoss should be greater than current
+                    if (currentStop == null) {
+                        // if DB has null, accept if newStopLoss < entryPrice (safe guard) or just accept
+                        allowUpdate = true;
+                    } else {
+                        allowUpdate = newStopLoss > currentStop;
+                    }
+                } else if (trade.getSide() == Signal.Side.SELL) {
+                    // For SELL (short), stoploss moves downward to lock profits: newStopLoss should be less than current
+                    if (currentStop == null) {
+                        allowUpdate = true;
+                    } else {
+                        allowUpdate = newStopLoss < currentStop;
+                    }
+                } else {
+                    // unknown side - be conservative and skip
+                    logger.warn("Unknown trade side for trade {}: {}. Skipping stop loss update", trade.getTradeId(), trade.getSide());
+                    c.commit();
+                    return;
+                }
+
+                if (!allowUpdate) {
+                    logger.debug("Not updating stop_loss for trade {}: newStopLoss={} does not tighten currentStop={}",
+                            trade.getTradeId(), newStopLoss, currentStop);
+                    c.commit();
+                    return;
+                }
+
+                // perform update
+                try (PreparedStatement ups = c.prepareStatement(updateSql)) {
+                    ups.setDouble(1, newStopLoss);
+                    ups.setString(2, trade.getTradeId());
+                    int rows = ups.executeUpdate();
+                    if (rows > 0) {
+                        // update succeeded
+                        logger.info("Updated stop_loss for trade {} -> {} (rows={})", trade.getTradeId(), newStopLoss, rows);
+                        // update in-memory model for caller convenience
+                        trade.setStopLoss(newStopLoss);
+                    } else {
+                        logger.warn("No rows updated when trying to set stop_loss for trade {} (maybe status not OPEN anymore)", trade.getTradeId());
+                    }
+                }
+
+                c.commit();
+            } catch (SQLException ex) {
+                // rollback on any error
+                try {
+                    c.rollback();
+                } catch (SQLException rb) {
+                    logger.error("Rollback failed after updateStopLoss error for {}: {}", trade.getTradeId(), rb.getMessage(), rb);
+                }
+                logger.error("Failed updateStopLoss for trade {}: {}", trade.getTradeId(), ex.getMessage(), ex);
+                throw ex;
+            } finally {
+                // restore auto commit state
+                try {
+                    c.setAutoCommit(previousAutoCommit);
+                } catch (SQLException ignore) {}
+            }
+        }
+    }
+
+
 
 }

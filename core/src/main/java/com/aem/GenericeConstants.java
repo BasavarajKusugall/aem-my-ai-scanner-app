@@ -12,4 +12,6 @@ public class GenericeConstants {
     public static final String ORDER_TYPE_CNC = "CNC";
     public static final String STOCK_TRADES_TABLE = "stock_trades";
     public static final String CURRENCY_TRADES_TABLE = "currency_trades";
+    public static final String CLOSED = "CLOSED";
+    public static final String OPEN = "OPEN";
 }

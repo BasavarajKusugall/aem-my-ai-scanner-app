@@ -59,4 +59,5 @@ public interface DAOFactory {
     List<TradeModel> listForceClosedTradesForSymbol(String symbol,String tableName) throws SQLException;
 
     List<TelegramConfig> fetchTelegramKiteAlertsConfigs();
+    void updateStopLoss(TradeModel trade, double newStopLoss, String table) throws SQLException;
 }

@@ -34,6 +34,7 @@ public class TradeModel {
     private String brokerAccountRef;
     private int liveOrderId;
     private int liveTradeId;
+    private double trailingIncrement;
 
     public String getBrokerAccountRef() {
         return brokerAccountRef;
@@ -81,6 +82,14 @@ public class TradeModel {
 
     public PivotLevels getPivotLevels() {
         return pivotLevels;
+    }
+
+    public double getTrailingIncrement() {
+        return trailingIncrement;
+    }
+
+    public void setTrailingIncrement(double trailingIncrement) {
+        this.trailingIncrement = trailingIncrement;
     }
 
     public enum Status {

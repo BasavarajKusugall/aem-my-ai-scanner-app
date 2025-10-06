@@ -5,4 +5,6 @@ find main/ -type f ! -name "*.D" ! -name "*.json" -exec sh -c 'echo "=== {} ==="
 # Implement trailing SL and Target
 # Similarly check the target with pivot levels.
 # todo : OHL scanner
+mvn clean install -P autoInstallAll -Dsling.host=192.168.31.200
+
 

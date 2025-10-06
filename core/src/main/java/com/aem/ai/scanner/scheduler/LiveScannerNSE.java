@@ -17,6 +17,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.sling.commons.scheduler.ScheduleOptions;
+import org.apache.sling.commons.scheduler.Scheduler;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
@@ -35,7 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 // Similarly check the target with pivot levels.
 @Designate(ocd = LiveScannerNSE.Config.class)
 @Component(
-        service = {Runnable.class,LiveScannerNSE.class},
+        service = Runnable.class,
         immediate = true,
         property = {
                 "scheduler.name=LiveScannerNSE"
@@ -110,9 +112,8 @@ public class LiveScannerNSE implements Runnable {
     private int cutOffHour = 14;
     private int cutOffMinute = 0;
 
-
-
-
+    @Reference
+    private Scheduler scheduler;
     private final Map<String, MarketDataService> servicesByBroker = new ConcurrentHashMap<>();
     private static final Map<String, PivotLevels> DAILY_PIVOT_LEVELS = new ConcurrentHashMap<>();
     private static LocalDateTime lastPivotCalculation = null;
@@ -165,12 +166,39 @@ public class LiveScannerNSE implements Runnable {
         }
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         stocksTradeTable = cfg.trades_table();
+        // Schedule the job
+        try { scheduler.unschedule("LiveScannerNSE"); } catch (Exception ignore) {}
+        scheduleJob(cfg);
+
+        // Register self-healing monitor
         log.info("✅ LiveScannerNSE activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
+    }
+    private void scheduleJob(Config cfg) {
+        if (!cfg.enable()) {
+            log.info("Scheduler is disabled in config.");
+            return;
+        }
+        try {
+            boolean unschedule = scheduler.unschedule(cfg.scheduler_name());// remove old instance
+            log.info("Scheduler unscheduled: {}", unschedule);
+            ScheduleOptions options = scheduler.EXPR(cfg.scheduler_expression());
+            options.name(cfg.scheduler_name());
+            options.canRunConcurrently(cfg.scheduler_concurrent());
+            boolean schedule = scheduler.schedule(this, options);
+            if (!schedule) {
+                log.error("Failed to schedule job with name: {}", cfg.scheduler_name());
+                return;
+            }
+            log.info("Scheduler registered with cron {}", cfg.scheduler_expression());
+        } catch (Exception e) {
+            log.error("Failed to register scheduler", e);
+        }
     }
 
     @Deactivate
     protected void deactivate() {
         log.info("🛑 LiveScannerNSE deactivated.");
+        try { scheduler.unschedule("LiveScannerNSE"); } catch (Exception ignore) {}
     }
     private static final String SCHEDULER_KEY = "LiveScannerNSE";
 
@@ -220,7 +248,7 @@ public class LiveScannerNSE implements Runnable {
             return;
         }
         MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
-        if (marketStatus == null || !StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), "OPEN")) {
+        if (marketStatus == null || !StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), GenericeConstants.OPEN)) {
             log.warn("Market is not open (status={})", marketStatus != null ? marketStatus.getMarketStatus() : "null");
             return;
         }
@@ -348,7 +376,7 @@ public class LiveScannerNSE implements Runnable {
 
 
                 MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
-                boolean closed = marketStatus != null && StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), "CLOSED");
+                boolean closed = marketStatus != null && StringUtils.equalsIgnoreCase(marketStatus.getMarketStatus(), GenericeConstants.CLOSED);
 
                 boolean misClose = closed && StringUtils.equalsIgnoreCase(t.getOrderType(), GenericeConstants.ORDER_TYPE_MIS);
                 if (hitTarget || hitStop || misClose) {

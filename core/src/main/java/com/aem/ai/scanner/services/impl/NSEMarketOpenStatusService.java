@@ -1,5 +1,6 @@
 package com.aem.ai.scanner.services.impl;
 
+import com.aem.GenericeConstants;
 import com.aem.ai.scanner.model.MarketStatusResult;
 import com.aem.ai.scanner.scheduler.LiveScannerNSE;
 import com.aem.ai.scanner.services.HttpService;
@@ -40,6 +41,10 @@ public class NSEMarketOpenStatusService {
         this.tradeCloseBufferMinutes = config.tradeCloseBufferMinutes();
     }
 
+    public int getTradeCloseBufferMinutes() {
+        return tradeCloseBufferMinutes;
+    }
+
     public MarketStatusResult getMarketStatus() throws Exception {
         MarketStatusResult result = new MarketStatusResult();
 
@@ -59,7 +64,7 @@ public class NSEMarketOpenStatusService {
         JsonNode nseNode = null;
         if (dataArray == null || !dataArray.isArray()) {
             LOG.info("No market timings data found in response");
-            result.setMarketStatus("CLOSED");
+            result.setMarketStatus(GenericeConstants.CLOSED);
             return result;
         }
 
@@ -71,7 +76,9 @@ public class NSEMarketOpenStatusService {
         }
 
         if (nseNode == null) {
-            throw new RuntimeException("NSE timings not found in response");
+            LOG.info("NSE market timings not found in response");
+            result.setMarketStatus(GenericeConstants.CLOSED);
+            return result;
         }
 
         long startMillis = nseNode.path("start_time").asLong();
@@ -91,8 +98,8 @@ public class NSEMarketOpenStatusService {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
 
         String status = (now.isAfter(marketOpen) && now.isBefore(adjustedClose))
-                ? "OPEN"
-                : "CLOSED";
+                ? GenericeConstants.OPEN
+                : GenericeConstants.CLOSED;
 
         // 4. Return structured result
         result.setExchange("NSE");
@@ -114,6 +121,6 @@ public class NSEMarketOpenStatusService {
                 name = "Trade Close Buffer (minutes)",
                 description = "How many minutes before official market close to treat as CLOSED"
         )
-        int tradeCloseBufferMinutes() default 15;
+        int tradeCloseBufferMinutes() default 5;
     }
 }
