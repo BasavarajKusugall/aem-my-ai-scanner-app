@@ -254,7 +254,13 @@
             <groupId>org.apache.sling</groupId>
             <scope>provided</scope>
         </dependency>
-
+        <!-- https://mvnrepository.com/artifact/org.apache.sling/org.apache.sling.event -->
+        <dependency>
+            <groupId>org.apache.sling</groupId>
+            <artifactId>org.apache.sling.event</artifactId>
+            <version>4.3.14</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <!--
