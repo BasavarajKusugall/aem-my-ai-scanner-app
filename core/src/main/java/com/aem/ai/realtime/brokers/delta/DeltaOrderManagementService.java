@@ -1,13 +1,18 @@
-package com.aem.ai.realtime.brokers.kite;
+package com.aem.ai.realtime.brokers.delta;
+
 
 import com.aem.ai.exception.ApiException;
+import com.aem.ai.realtime.brokers.kite.OrderDetail;
+import com.aem.ai.realtime.brokers.kite.OrderRequest;
+import com.aem.ai.realtime.brokers.kite.OrderResponse;
+import com.aem.ai.realtime.brokers.kite.TradeDetail;
 
 import java.util.List;
 
 /**
  * OrderService - generic operations.
  */
-public interface OrderService {
+public interface DeltaOrderManagementService {
     boolean isEnable();
     boolean isDryRun();
     OrderResponse placeOrder(String variety, OrderRequest req) throws ApiException;

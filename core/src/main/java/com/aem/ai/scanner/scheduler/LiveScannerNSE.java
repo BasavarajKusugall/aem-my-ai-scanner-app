@@ -12,7 +12,6 @@ import com.aem.ai.scanner.services.TelegramService;
 import com.aem.ai.scanner.services.impl.NSEMarketOpenStatusService;
 import com.aem.ai.scanner.utils.Timeframes;
 import com.aem.ai.scanner.utils.Utils;
-import com.aem.system.scheduers.SelfHealingSchedulerMonitor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;

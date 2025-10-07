@@ -21,10 +21,10 @@ import java.util.Map;
 /**
  * OSGi implementation of the generic OrderService for Kite broker.
  */
-@Component(service = OrderService.class, immediate = true)
-public class KiteOrderServiceImpl implements OrderService {
+@Component(service = KiteOrderManagmentService.class, immediate = true)
+public class KiteKiteOrderManagmentServiceImpl implements KiteOrderManagmentService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(KiteOrderServiceImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(KiteKiteOrderManagmentServiceImpl.class);
 
     private boolean dryRun;
     private boolean enable;

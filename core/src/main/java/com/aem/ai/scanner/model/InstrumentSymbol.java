@@ -1,13 +1,14 @@
 package com.aem.ai.scanner.model;
 
 
+import org.apache.sling.api.resource.Resource;
 import org.apache.sling.models.annotations.DefaultInjectionStrategy;
 import org.apache.sling.models.annotations.Model;
 import org.apache.sling.models.annotations.injectorspecific.ValueMapValue;
 
 import java.util.Objects;
 
-@Model(adaptables = org.apache.sling.api.resource.Resource.class,
+@Model(adaptables = Resource.class,
         defaultInjectionStrategy = DefaultInjectionStrategy.OPTIONAL)
 public class InstrumentSymbol {
 
@@ -25,6 +26,7 @@ public class InstrumentSymbol {
 
     @ValueMapValue(name = "instrument_key")
     private String instrumentKey;
+    private String securityId;
 
     // Default constructor required for Sling Models
     public InstrumentSymbol() {
@@ -122,5 +124,13 @@ public class InstrumentSymbol {
     public int hashCode() {
         if (instrumentKey != null) return instrumentKey.hashCode();
         return symbol == null ? 0 : symbol.hashCode();
+    }
+
+    public String getSecurityId() {
+        return securityId;
+    }
+
+    public void setSecurityId(String securityId) {
+        this.securityId = securityId;
     }
 }

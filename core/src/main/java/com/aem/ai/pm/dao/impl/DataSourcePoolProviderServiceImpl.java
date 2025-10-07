@@ -48,64 +48,19 @@ public class DataSourcePoolProviderServiceImpl implements DataSourcePoolProvider
     @Override
     public Connection getConnection() throws SQLException {
         if (dataSource != null) {
-
-            log.info("{}✅ Returning injected DataSource instance for name={}{}", GREEN,  RESET);
-            return dataSource.getConnection();
-        }
-        /*// Primary approach: use ServiceTracker if initialized
-        if (tracker != null) {
-            ServiceReference<DataSource>[] refs = tracker.getServiceReferences();
-            if (refs != null) {
-                for (ServiceReference<DataSource> ref : refs) {
-                    if (ref != null && OsgiUtils.hasDataSourceName(ref, name)) {
-                        DataSource ds = tracker.getService((ServiceReference<DataSource>) ref);
-                        if (ds != null) {
-                            log.info("{}✅ Found DataSource via ServiceTracker: {}{}", GREEN, name, RESET);
-                            return ds;
-                        }
-                    }
-                }
-            } else {
-                log.warn("{}⚠️ No DataSources registered in ServiceTracker{}", YELLOW, RESET);
+            Connection connection = dataSource.getConnection();
+            if (connection != null || connection.isValid(2)){
+                connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+                connection.setAutoCommit(true); // ensure commit per statement
+                log.info("{}✅ Returning injected DataSource instance for name={}{}", GREEN,  RESET);
+                return connection;
+            }else {
+                Connection newConnection = dataSource.getConnection();
+                newConnection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+                connection.setAutoCommit(true); // ensure commit per statement
+                return newConnection;
             }
-        } else {
-            log.warn("{}⚠️ ServiceTracker not initialized. Falling back to BundleContext lookup{}", RED, RESET);
         }
-        if (bundleContext == null || bundleContext.getBundle() == null
-                || bundleContext.getBundle().getState() != Bundle.ACTIVE) {
-            log.error("❌ BundleContext is invalid (bundle not active). Skipping DataSource lookup.");
-            return null;
-        }
-
-        // Fallback: use direct BundleContext lookup
-        if (bundleContext != null) {
-            try {
-                @SuppressWarnings("unchecked")
-                ServiceReference<DataSource>[] refs =
-                        (ServiceReference<DataSource>[]) bundleContext.getServiceReferences(DataSource.class.getName(), null);
-
-                if (refs != null) {
-                    for (ServiceReference<DataSource> ref : refs) {
-                        log.debug("{}🔍 Checking DataSource properties...{}", CYAN, RESET);
-                        OsgiUtils.printDataSourceProps(ref);
-
-                        if (OsgiUtils.hasDataSourceName(ref, name)) {
-                            DataSource ds = bundleContext.getService(ref);
-                            log.info("{}✅ Found DataSource via BundleContext fallback: {}{}", GREEN, name, RESET);
-                            return ds;
-                        }
-                    }
-                } else {
-                    log.warn("{}⚠️ No DataSource services registered in OSGi!{}", RED, RESET);
-                }
-
-            } catch (InvalidSyntaxException e) {
-                log.error("{}❌ Invalid OSGi filter while looking up datasource: {}{}", RED, e.getMessage(), RESET, e);
-            }
-        } else {
-            log.error("{}❌ BundleContext is null. Cannot lookup DataSource{}", RED, RESET);
-        }*/
-
         log.error("{}⚠️ No DataSource found with name={}{}", RED,  RESET);
         return null;
     }

@@ -1,7 +1,7 @@
 package com.aem.ai.scanner.scheduler;
 
 import com.aem.GenericeConstants;
-import com.aem.ai.realtime.brokers.kite.OrderService;
+import com.aem.ai.realtime.brokers.kite.KiteOrderManagmentService;
 import com.aem.ai.scanner.api.MarketDataService;
 import com.aem.ai.scanner.dao.DAOFactory;
 import com.aem.ai.scanner.model.*;
@@ -79,7 +79,7 @@ public class TradesMonitorScheduler implements Runnable {
 
     // optional: order execution service (if present)
     @Reference
-    private OrderService orderService; // you have OrderService used by test servlet
+    private KiteOrderManagmentService kiteOrderManagmentService; // you have OrderService used by test servlet
 
     @Reference
     private Scheduler scheduler;
@@ -140,6 +140,8 @@ public class TradesMonitorScheduler implements Runnable {
                     continue;
                 }
                 String broker = svc.brokerCode();
+                String table = chooseTableForBroker(broker);
+
                 if (StringUtils.equalsIgnoreCase(broker,GenericeConstants.UPSTOX)){
                     // NSE market hours check
                     MarketStatusResult marketStatus = nseMarketOpenStatusService.getMarketStatus();
@@ -147,9 +149,9 @@ public class TradesMonitorScheduler implements Runnable {
                         log.debug("NSE market is closed - skipping Upstox trade monitoring run.");
                         continue;
                     }
+                    log.info("NSE market is open - proceeding with Upstox trade monitoring run.");
+                    ensureMisOrdersSquaredIfNeeded(svc, table);
                 }
-                String table = chooseTableForBroker(broker);
-                ensureMisOrdersSquaredIfNeeded(svc, table);
                 List<TradeModel> openTrades = daoFactory.listAllOpenTrades(table);
                 if (openTrades == null || openTrades.isEmpty()) {
                     log.debug("No open trades found for broker {} table {}", broker, table);
@@ -463,6 +465,7 @@ public class TradesMonitorScheduler implements Runnable {
 
                     // Execute exit. performExit handles broker order + DB close + alerts consistently.
                     log.info("Squaring MIS trade {} symbol={} ltp={} table={}", t.getTradeId(), t.getSymbol() == null ? "?" : t.getSymbol().getSymbol(), ltp, table);
+                    t.setReason("MIS_SESSION_SQUAREOFF");
                     performExit(t, ltp, "MIS_SESSION_SQUAREOFF", table);
                 } catch (Exception ex) {
                     log.error("Error squaring off MIS trade {}: {}", t == null ? "null" : t.getTradeId(), ex.getMessage(), ex);
@@ -518,7 +521,7 @@ public class TradesMonitorScheduler implements Runnable {
 
     // Optional OrderService binding - dynamic
     @Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC)
-    protected void bindOrderService(OrderService s) { this.orderService = s; }
+    protected void bindOrderService(KiteOrderManagmentService s) { this.kiteOrderManagmentService = s; }
 
-    protected void unbindOrderService(OrderService s) { if (this.orderService == s) this.orderService = null; }
+    protected void unbindOrderService(KiteOrderManagmentService s) { if (this.kiteOrderManagmentService == s) this.kiteOrderManagmentService = null; }
 }

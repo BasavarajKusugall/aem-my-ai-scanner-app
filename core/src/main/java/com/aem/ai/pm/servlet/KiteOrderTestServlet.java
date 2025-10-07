@@ -6,7 +6,6 @@ import com.aem.ai.scanner.model.InstrumentSymbol;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
-import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -35,7 +34,7 @@ public class KiteOrderTestServlet extends SlingSafeMethodsServlet {
     private static final Logger LOG = LoggerFactory.getLogger(KiteOrderTestServlet.class);
 
     @Reference
-    private OrderService orderService;
+    private KiteOrderManagmentService kiteOrderManagmentService;
 
     @Override
     protected void doGet(SlingHttpServletRequest req,
@@ -72,14 +71,14 @@ public class KiteOrderTestServlet extends SlingSafeMethodsServlet {
             String action = req.getParameter("action");
             if (!StringUtils.equalsIgnoreCase(action, "cancel")){
                 // --- Place order ---
-                OrderResponse orderResp = orderService.placeOrder(variety, orderReq);
+                OrderResponse orderResp = kiteOrderManagmentService.placeOrder(variety, orderReq);
 
                 // --- Return JSON response ---
                 out.write("{\"status\":\"success\",\"order_id\":\"" + orderResp.order_id + "\"}");
                 LOG.info("Order placed successfully: {}", orderResp.order_id);
             }
             // --- List existing orders and modify/cancel them ---
-            List<OrderDetail> orderDetailList = orderService.listOrders();
+            List<OrderDetail> orderDetailList = kiteOrderManagmentService.listOrders();
             if (!orderDetailList.isEmpty()) {
                 for (OrderDetail od : orderDetailList) {
                     LOG.info("Existing Order: ID={} Status={}", od.order_id, od.status);
@@ -87,11 +86,11 @@ public class KiteOrderTestServlet extends SlingSafeMethodsServlet {
                     orderReq.setPrice(420.0);
                     orderReq.setValidity("DAY");
                     orderReq.setOrder_type("LIMIT");//MARKET/LIMIT
-                    OrderResponse amo = orderService.modifyOrder("amo", od.order_id, orderReq);
+                    OrderResponse amo = kiteOrderManagmentService.modifyOrder("amo", od.order_id, orderReq);
                     LOG.info("Modified Order: ID={} Status={}", amo.order_id);
 
                     if (StringUtils.equalsIgnoreCase(action, "cancel")){
-                        OrderResponse cancelOrder = orderService.cancelOrder("amo", od.order_id);
+                        OrderResponse cancelOrder = kiteOrderManagmentService.cancelOrder("amo", od.order_id);
                         LOG.info("Cancelled Order: ID={} Status={}", cancelOrder.order_id);
                         out.write("{\"status\":\"Cancelled\",\"order_id\":\"" + cancelOrder.order_id + "\"}");
                     }

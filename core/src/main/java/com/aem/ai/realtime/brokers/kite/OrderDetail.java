@@ -23,6 +23,24 @@ public class OrderDetail {
     public String account_id;
     public String placed_by;
     public String guid;
+    public Double trigger_price;
+    public String tag;
+
+    public String getTag() {
+        return tag;
+    }
+
+    public void setTag(String tag) {
+        this.tag = tag;
+    }
+
+    public Double getTrigger_price() {
+        return trigger_price;
+    }
+
+    public void setTrigger_price(Double trigger_price) {
+        this.trigger_price = trigger_price;
+    }
 
     // Getters & Setters (keep your existing ones)
 

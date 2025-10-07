@@ -27,10 +27,8 @@ public class PortfolioSyncServiceImpl implements PortfolioSyncService {
     private static final String YELLOW = "\u001B[33m";
     private static final String CYAN   = "\u001B[36m";
 
-    private DataSource dataSource;
-
     @Reference
-    private DataSourcePoolProviderService dataSourcePoolProviderService;
+    private DataSource dataSource;
 
     @Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC)
     private volatile List<BrokerConnector> connectors;

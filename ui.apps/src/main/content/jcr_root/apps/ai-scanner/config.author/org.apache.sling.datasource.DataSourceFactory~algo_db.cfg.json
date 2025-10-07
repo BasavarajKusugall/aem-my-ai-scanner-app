@@ -1,32 +1,38 @@
 {
-  "password":"Bas@1234",
-  "defaultAutoCommit":"Default",
-  "maxIdle:Integer":100,
-  "initSQL":"",
-  "validationQueryTimeout:Integer":-1,
-  "minEvictableIdleTimeMillis:Integer":60000,
-  "driverClassName":"com.mysql.cj.jdbc.Driver",
-  "username":"root",
-  "url":"jdbc:mysql://localhost:3306/algo_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata",
-  "testOnBorrow":false,
-  "maxWait:Integer":30000,
-  "connectionProperties":"",
-  "datasource.name":"mysql-algo_db_datasource",
-  "testWhileIdle":false,
-  "maxActive:Integer":100,
-  "jdbcInterceptors":"StatementCache;SlowQueryReport(threshold=10000);ConnectionState",
-  "timeBetweenEvictionRunsMillis:Integer":5000,
-  "initialSize:Integer":10,
-  "validationInterval:Integer":30000,
-  "testOnReturn":false,
-  "datasource.svc.prop.name":"mysql-algo_db_datasource",
-  "defaultTransactionIsolation":"READ_COMMITTED",
-  "validationQuery":"",
-  "logValidationErrors":true,
-  "datasource.svc.properties":[
-  ],
-  "maxAge:Integer":0,
-  "defaultCatalog":"",
-  "defaultReadOnly":"Default",
-  "minIdle:Integer":10
+  "password": "Bas@1234",
+  "defaultAutoCommit": "Default",
+  "maxIdle:Integer": 100,
+  "initSQL": "",
+  "validationQueryTimeout:Integer": 5,
+  "minEvictableIdleTimeMillis:Integer": 60000,
+  "driverClassName": "com.mysql.cj.jdbc.Driver",
+  "username": "root",
+
+  "url": "jdbc:mysql://localhost:3306/algo_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&autoReconnect=true&tcpKeepAlive=true",
+
+  "testOnBorrow": true,
+  "testOnReturn": false,
+  "testWhileIdle": true,
+
+  "validationQuery": "SELECT 1",
+  "validationInterval:Integer": 30000,
+  "timeBetweenEvictionRunsMillis:Integer": 30000,
+
+  "maxWait:Integer": 30000,
+  "maxActive:Integer": 100,
+  "initialSize:Integer": 10,
+  "minIdle:Integer": 10,
+
+  "connectionProperties": "",
+  "jdbcInterceptors": "StatementCache;SlowQueryReport(threshold=10000);ConnectionState",
+  "logValidationErrors": true,
+
+  "datasource.name": "mysql-algo_db_datasource",
+  "datasource.svc.prop.name": "mysql-algo_db_datasource",
+  "datasource.svc.properties": [],
+
+  "maxAge:Integer": 0,
+  "defaultCatalog": "",
+  "defaultReadOnly": "Default",
+  "defaultTransactionIsolation": "READ_COMMITTED"
 }
