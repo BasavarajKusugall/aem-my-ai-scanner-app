@@ -18,6 +18,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.commons.scheduler.ScheduleOptions;
 import org.apache.sling.commons.scheduler.Scheduler;
+import org.apache.sling.event.jobs.Job;
+import org.apache.sling.event.jobs.JobBuilder;
+import org.apache.sling.event.jobs.JobManager;
+import org.apache.sling.event.jobs.ScheduledJobInfo;
+import org.apache.sling.event.jobs.consumer.JobConsumer;
 import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
@@ -36,14 +41,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 // Similarly check the target with pivot levels.
 @Designate(ocd = LiveScannerNSE.Config.class)
 @Component(
-        service = Runnable.class,
+        service = JobConsumer.class,
         immediate = true,
         property = {
-                "scheduler.name=LiveScannerNSE"
+                JobConsumer.PROPERTY_TOPICS + "=" + LiveScannerNSE.JOB_TOPIC
         }
 )
-public class LiveScannerNSE implements Runnable {
-
+public class LiveScannerNSE implements JobConsumer {
+    public static final String JOB_TOPIC = "com/aem/ai/scanner/jobs/LiveScannerNSE";
+    private static final String JOB_NAME = "LiveScannerNSE";
     private static final Logger log = LoggerFactory.getLogger(LiveScannerNSE.class);
 
     @ObjectClassDefinition(name = "BSK NSE UPSTOX Live Scanner Scheduler",
@@ -107,6 +113,7 @@ public class LiveScannerNSE implements Runnable {
 
     @Reference
     private NSEMarketOpenStatusService nseMarketOpenStatusService;
+    @Reference private JobManager jobManager;
 
     private int cutOffHour = 14;
     private int cutOffMinute = 0;
@@ -166,8 +173,8 @@ public class LiveScannerNSE implements Runnable {
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         stocksTradeTable = cfg.trades_table();
         // Schedule the job
-        try { scheduler.unschedule("LiveScannerNSE"); } catch (Exception ignore) {}
-        scheduleJob(cfg);
+        removeScheduledJobs();
+        addScheduledJob();
 
         // Register self-healing monitor
         log.info("✅ LiveScannerNSE activated: cron={} retries={}", cfg.scheduler_expression(), cfg.retries());
@@ -193,32 +200,65 @@ public class LiveScannerNSE implements Runnable {
             log.error("Failed to register scheduler", e);
         }
     }
+    private void addScheduledJob() {
+        try {
+            if (!config.enable()) {
+                log.info("Scheduler disabled by config.");
+                return;
+            }
+            Collection<ScheduledJobInfo> existing = jobManager.getScheduledJobs(JOB_TOPIC, 1, null);
+            if (existing.isEmpty()) {
+                JobBuilder.ScheduleBuilder sb = jobManager.createJob(JOB_TOPIC).schedule();
+                sb.cron(config.scheduler_expression());
+                if (sb.add() == null) {
+                    log.error("Failed to add scheduled job for {}", JOB_NAME);
+                } else {
+                    log.info("Scheduled job created for {}", JOB_NAME);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error scheduling job {}", JOB_NAME, e);
+        }
+    }
+
+    private void removeScheduledJobs() {
+        try {
+            Collection<ScheduledJobInfo> jobs = jobManager.getScheduledJobs(JOB_TOPIC, 0, null);
+            for (ScheduledJobInfo job : jobs) {
+                job.unschedule();
+                log.info("Removed existing job: {}", job.getJobTopic());
+            }
+        } catch (Exception e) {
+            log.error("Error while removing existing jobs for {}", JOB_NAME, e);
+        }
+    }
 
     @Deactivate
     protected void deactivate() {
         log.info("🛑 LiveScannerNSE deactivated.");
-        try { scheduler.unschedule("LiveScannerNSE"); } catch (Exception ignore) {}
+         removeScheduledJobs();
     }
     private static final String SCHEDULER_KEY = "LiveScannerNSE";
 
     @Override
-    public void run() {
+    public JobResult process(Job job) {
         try {
             boolean isMarketClose = Utils.isMarketClose();
             if (isMarketClose){
                 log.error(" Market is closed. Skipping this run.");
-                return;
+                return JobResult.CANCEL;
             }
             log.info("💡 LiveScannerNSE scheduler triggered at {}", LocalDateTime.now());
             doRun(); // move your original run() logic into doRun()
             // reset scheduler-level failures on success
             AtomicInteger ai = consecutiveFailures.get(SCHEDULER_KEY);
             if (ai != null) ai.set(0);
+            return JobResult.OK;
         } catch (Throwable t) {
             // Catch everything so Sling doesn't unschedule the job
             log.error("❌ Unhandled error in LiveScannerNSE scheduler (kept alive): {}", t.getMessage(), t);
             consecutiveFailures.computeIfAbsent(SCHEDULER_KEY, k -> new AtomicInteger()).incrementAndGet();
-            // do NOT rethrow
+            return JobResult.FAILED;
         }
     }
 
